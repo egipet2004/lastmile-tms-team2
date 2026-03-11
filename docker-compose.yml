@@ -1,4 +1,39 @@
 services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      api:
+        condition: service_started
+      web:
+        condition: service_started
+
+  api:
+    build:
+      context: src/backend
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=lastmile_tms;Username=postgres;Password=postgres
+      ConnectionStrings__HangfireConnection: Host=postgres;Port=5432;Database=lastmile_tms;Username=postgres;Password=postgres
+      ConnectionStrings__Redis: redis:6379
+      Serilog__WriteTo__1__Args__serverUrl: http://seq:80
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  web:
+    build:
+      context: src/web
+      dockerfile: Dockerfile
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost/api
+
   postgres:
     image: postgis/postgis:17-3.5
     environment:
