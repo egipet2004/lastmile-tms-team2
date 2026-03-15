@@ -1,6 +1,7 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\LastMile.TMS.Application\LastMile.TMS.Application.csproj" />
   </ItemGroup>
 
@@ -8,6 +9,7 @@
     <PackageReference Include="Hangfire.Core" Version="1.8.23" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.4" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.4" />
+    <PackageReference Include="OpenIddict.AspNetCore" Version="7.3.0" />
     <PackageReference Include="QuestPDF" Version="2026.2.3" />
     <PackageReference Include="SendGrid" Version="9.29.3" />
     <PackageReference Include="Twilio" Version="7.14.3" />

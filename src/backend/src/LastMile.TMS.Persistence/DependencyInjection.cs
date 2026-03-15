@@ -11,15 +11,24 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddPersistence(this IServiceCollection services, IConfiguration configuration)
     {
+        var connectionString = configuration.GetConnectionString("DefaultConnection");
         services.AddDbContext<AppDbContext>(options =>
         {
-            options.UseNpgsql(
-                configuration.GetConnectionString("DefaultConnection"),
-                npgsql =>
-                {
-                    npgsql.UseNetTopologySuite();
-                    npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
-                });
+            if (connectionString == "InMemory")
+            {
+                // Used in integration tests — swap Postgres for an in-memory store.
+                options.UseInMemoryDatabase("TestDb");
+            }
+            else
+            {
+                options.UseNpgsql(
+                    connectionString,
+                    npgsql =>
+                    {
+                        npgsql.UseNetTopologySuite();
+                        npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
+                    });
+            }
 
             // Register the entity sets needed by OpenIddict.
             options.UseOpenIddict();
@@ -46,6 +55,8 @@ public static class DependencyInjection
             });
 
         services.AddScoped<IAppDbContext>(provider => provider.GetRequiredService<AppDbContext>());
+
+        services.AddHostedService<DbSeeder>();
 
         return services;
     }
