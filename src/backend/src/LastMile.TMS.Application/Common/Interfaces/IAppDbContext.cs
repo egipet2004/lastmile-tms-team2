@@ -5,8 +5,8 @@ namespace LastMile.TMS.Application.Common.Interfaces;
 
 public interface IAppDbContext
 {
-    DbSet<User> Users { get; }
-    DbSet<Role> Roles { get; }
+    DbSet<ApplicationUser> Users { get; }
+    DbSet<ApplicationRole> Roles { get; }
     DbSet<Permission> Permissions { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

@@ -4,18 +4,10 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace LastMile.TMS.Persistence.Configurations;
 
-public class RoleConfiguration : IEntityTypeConfiguration<Role>
+public class ApplicationRoleConfiguration : IEntityTypeConfiguration<ApplicationRole>
 {
-    public void Configure(EntityTypeBuilder<Role> builder)
+    public void Configure(EntityTypeBuilder<ApplicationRole> builder)
     {
-        builder.ToTable("Roles");
-
-        builder.HasKey(r => r.Id);
-
-        builder.Property(r => r.Name)
-            .IsRequired()
-            .HasMaxLength(100);
-
         builder.Property(r => r.Description)
             .HasMaxLength(500);
 

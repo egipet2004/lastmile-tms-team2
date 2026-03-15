@@ -1,13 +1,13 @@
 using FluentAssertions;
 using LastMile.TMS.Domain.Entities;
+using LastMile.TMS.Domain.Enums;
 
 namespace LastMile.TMS.Domain.Tests.Entities;
 
-public class RoleTests
+public class ApplicationRoleTests
 {
-
     [Fact]
-    public void Role_ShouldHavePredefinedRoles()
+    public void PredefinedRole_ShouldHaveAllExpectedValues()
     {
         // Assert - All predefined roles should exist
         Enum.GetValues<PredefinedRole>().Should().NotBeEmpty();
@@ -26,10 +26,10 @@ public class RoleTests
     }
 
     [Fact]
-    public void Role_ShouldSetNameFromPredefinedRole()
+    public void ApplicationRole_ShouldSetNameFromPredefinedRole()
     {
         // Arrange & Act
-        var role = new Role
+        var role = new ApplicationRole
         {
             Name = PredefinedRole.Admin.ToString(),
             Description = "System administrator with full access"
@@ -40,10 +40,10 @@ public class RoleTests
     }
 
     [Fact]
-    public void Role_ShouldAllowIsDefaultFlag()
+    public void ApplicationRole_ShouldAllowIsDefaultFlag()
     {
         // Arrange & Act
-        var role = new Role
+        var role = new ApplicationRole
         {
             Name = PredefinedRole.Driver.ToString(),
             IsDefault = true
@@ -51,5 +51,15 @@ public class RoleTests
 
         // Assert
         role.IsDefault.Should().BeTrue();
+    }
+
+    [Fact]
+    public void ApplicationRole_ShouldHaveGuidId()
+    {
+        // Arrange & Act
+        var role = new ApplicationRole();
+
+        // Assert — IdentityRole<Guid> uses Guid Id, defaults to Guid.Empty
+        role.Id.Should().Be(Guid.Empty);
     }
 }

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using LastMile.TMS.Domain.Entities;
+using LastMile.TMS.Domain.Enums;
 
 namespace LastMile.TMS.Domain.Tests.Entities;
 
