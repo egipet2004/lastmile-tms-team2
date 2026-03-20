@@ -3,8 +3,23 @@
 }
 
 :80 {
+	# NextAuth endpoints (must be before /api/*)
+	handle /api/auth/* {
+		reverse_proxy web:3000 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+
 	# API backend
 	handle /api/* {
+		reverse_proxy api:8080
+	}
+
+	# OAuth/OpenIddict endpoints
+	handle /connect/* {
 		reverse_proxy api:8080
 	}
 
@@ -31,6 +46,11 @@
 
 	# Next.js web app (default)
 	handle {
-		reverse_proxy web:3000
+		reverse_proxy web:3000 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+		}
 	}
 }

@@ -33,6 +33,10 @@ services:
       dockerfile: Dockerfile
     environment:
       NEXT_PUBLIC_API_URL: http://localhost/api
+      API_URL: http://api:8080
+      AUTH_SECRET: lastmile-tms-dev-secret-change-in-production
+      AUTH_TRUST_HOST: true
+      NEXTAUTH_URL: http://localhost
 
   postgres:
     image: postgis/postgis:17-3.5
