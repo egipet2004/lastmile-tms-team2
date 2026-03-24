@@ -1,9 +1,12 @@
+using HotChocolate;
+using LastMile.TMS.Api.GraphQL.Inputs;
 using LastMile.TMS.Application.Depots.Commands;
 using LastMile.TMS.Application.Depots.DTOs;
 using MediatR;
 
 namespace LastMile.TMS.Api.GraphQL.Mutations;
 
+[ExtendObjectType(OperationTypeNames.Mutation)]
 public class DepotMutation
 {
     public async Task<DepotDto> CreateDepot(
@@ -28,7 +31,7 @@ public class DepotMutation
         if (input.OperatingHours is not null)
         {
             operatingHours = input.OperatingHours.Select(h => new OperatingHoursDto(
-                h.DayOfWeek, h.OpenTime, h.ClosedTime, h.IsClosed)).ToList();
+                h.DayOfWeek, h.OpenTime?.ToString("HH:mm"), h.ClosedTime?.ToString("HH:mm"), h.IsClosed)).ToList();
         }
 
         return await mediator.Send(
@@ -63,7 +66,7 @@ public class DepotMutation
         if (input.OperatingHours is not null)
         {
             operatingHours = input.OperatingHours.Select(h => new OperatingHoursDto(
-                h.DayOfWeek, h.OpenTime, h.ClosedTime, h.IsClosed)).ToList();
+                h.DayOfWeek, h.OpenTime?.ToString("HH:mm"), h.ClosedTime?.ToString("HH:mm"), h.IsClosed)).ToList();
         }
 
         return await mediator.Send(
