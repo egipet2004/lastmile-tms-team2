@@ -17,6 +17,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
+    env_file:
+      - ./src/backend/src/LastMile.TMS.Api/.env
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=lastmile_tms;Username=postgres;Password=postgres
