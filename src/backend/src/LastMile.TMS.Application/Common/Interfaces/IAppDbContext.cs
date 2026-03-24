@@ -7,6 +7,8 @@ public interface IAppDbContext
 {
     DbSet<ApplicationUser> Users { get; }
     DbSet<ApplicationRole> Roles { get; }
+    DbSet<Depot> Depots { get; }
+    DbSet<Zone> Zones { get; }
     DbSet<Permission> Permissions { get; }
     DbSet<Driver> Drivers { get; }
     DbSet<Vehicle> Vehicles { get; }
