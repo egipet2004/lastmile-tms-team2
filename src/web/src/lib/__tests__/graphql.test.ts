@@ -1,12 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getSession } from "next-auth/react";
 import { graphqlRequest } from "../graphql";
+
+vi.mock("next-auth/react", () => ({
+  getSession: vi.fn(),
+}));
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
+const mockedGetSession = vi.mocked(getSession);
 
 describe("graphqlRequest", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost";
+    mockedGetSession.mockResolvedValue(null);
   });
 
   it("should send the query with the bearer token and return data", async () => {

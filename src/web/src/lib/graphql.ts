@@ -40,10 +40,12 @@ export async function graphqlRequest<TData>(
 ): Promise<TData> {
   const session = accessToken ? null : await getSession();
   const token = accessToken ?? session?.accessToken;
-  const headers = new Headers({ "Content-Type": "application/json" });
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
 
   if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
+    headers.Authorization = `Bearer ${token}`;
   }
 
   const res = await fetch(graphqlEndpointUrl(), {
