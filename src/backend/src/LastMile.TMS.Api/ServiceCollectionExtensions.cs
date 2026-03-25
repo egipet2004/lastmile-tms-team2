@@ -1,6 +1,9 @@
 using Hangfire;
 using Hangfire.PostgreSql;
 using LastMile.TMS.Api.GraphQL;
+using LastMile.TMS.Api.GraphQL.Inputs;
+using LastMile.TMS.Api.GraphQL.Mutations;
+using LastMile.TMS.Api.GraphQL.Queries;
 using LastMile.TMS.Api.GraphQL.Types;
 using Microsoft.AspNetCore.Authentication;
 
@@ -33,6 +36,25 @@ public static class ServiceCollectionExtensions
             .AddQueryType<Query>()
             .AddMutationType<Mutation>()
             .AddType<VehicleDtoType>()
+            .AddTypeExtension<DepotQuery>()
+            .AddTypeExtension<ZoneQuery>()
+            .AddTypeExtension<DepotMutation>()
+            .AddTypeExtension<ZoneMutation>()
+            .AddTypeExtension<ParcelMutation>()
+            .AddType<AddressType>()
+            .AddType<OperatingHoursType>()
+            .AddType<DepotType>()
+            .AddType<ZoneType>()
+            .AddType<ParcelType>()
+            .AddType<AddressInputType>()
+            .AddType<OperatingHoursInputType>()
+            .AddType<CreateDepotInputType>()
+            .AddType<UpdateDepotInputType>()
+            .AddType<CreateZoneInputType>()
+            .AddType<UpdateZoneInputType>()
+            .AddType<RegisterParcelInputType>()
+            .AddFiltering()
+            .AddSorting()
             .AddAuthorization()
             .AddErrorFilter<DomainExceptionErrorFilter>();
         services.AddEndpointsApiExplorer();

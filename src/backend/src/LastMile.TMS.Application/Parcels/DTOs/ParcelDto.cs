@@ -1,0 +1,25 @@
+namespace LastMile.TMS.Application.Parcels.DTOs;
+
+public record ParcelDto(
+    Guid Id,
+    string TrackingNumber,
+    string? Description,
+    string ServiceType,
+    string Status,
+    decimal Weight,
+    string WeightUnit,
+    decimal Length,
+    decimal Width,
+    decimal Height,
+    string DimensionUnit,
+    decimal DeclaredValue,
+    string Currency,
+    DateTimeOffset EstimatedDeliveryDate,
+    int DeliveryAttempts,
+    string? ParcelType,
+    Guid ZoneId,
+    string? ZoneName,
+    Guid DepotId,
+    string? DepotName,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? LastModifiedAt);

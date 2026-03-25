@@ -33,6 +33,11 @@
 		reverse_proxy api:8080
 	}
 
+	# GraphQL
+	handle /graphql* {
+		reverse_proxy api:8080
+	}
+
 	# Hangfire dashboard
 	handle /hangfire* {
 		reverse_proxy api:8080
