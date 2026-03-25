@@ -18,8 +18,8 @@ public class AddressInput
 public class OperatingHoursInput
 {
     public DayOfWeek DayOfWeek { get; set; }
-    public TimeOnly? OpenTime { get; set; }
-    public TimeOnly? ClosedTime { get; set; }
+    public string? OpenTime { get; set; }
+    public string? ClosedTime { get; set; }
     public bool IsClosed { get; set; }
 }
 

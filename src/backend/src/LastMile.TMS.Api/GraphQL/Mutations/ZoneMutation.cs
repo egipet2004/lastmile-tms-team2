@@ -1,4 +1,5 @@
 using HotChocolate;
+using HotChocolate.Authorization;
 using LastMile.TMS.Api.GraphQL.Inputs;
 using LastMile.TMS.Application.Zones.Commands;
 using LastMile.TMS.Application.Zones.DTOs;
@@ -9,6 +10,7 @@ namespace LastMile.TMS.Api.GraphQL.Mutations;
 [ExtendObjectType(OperationTypeNames.Mutation)]
 public class ZoneMutation
 {
+    [Authorize(Roles = new[] { "OperationsManager", "Admin" })]
     public async Task<ZoneDto> CreateZone(
         CreateZoneInput input,
         [Service] ISender mediator = null!,
@@ -25,6 +27,7 @@ public class ZoneMutation
             cancellationToken);
     }
 
+    [Authorize(Roles = new[] { "OperationsManager", "Admin" })]
     public async Task<ZoneDto?> UpdateZone(
         Guid id,
         UpdateZoneInput input,
@@ -43,6 +46,7 @@ public class ZoneMutation
             cancellationToken);
     }
 
+    [Authorize(Roles = new[] { "OperationsManager", "Admin" })]
     public async Task<bool> DeleteZone(
         Guid id,
         [Service] ISender mediator = null!,

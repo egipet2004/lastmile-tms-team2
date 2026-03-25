@@ -1,4 +1,5 @@
 using HotChocolate;
+using HotChocolate.Authorization;
 using LastMile.TMS.Api.GraphQL.Inputs;
 using LastMile.TMS.Application.Parcels.Commands;
 using LastMile.TMS.Application.Parcels.DTOs;
@@ -9,6 +10,7 @@ namespace LastMile.TMS.Api.GraphQL.Mutations;
 [ExtendObjectType(OperationTypeNames.Mutation)]
 public class ParcelMutation
 {
+    [Authorize(Roles = new[] { "OperationsManager", "Admin", "Dispatcher" })]
     public async Task<ParcelDto> RegisterParcel(
         RegisterParcelInput input,
         [Service] ISender mediator = null!,

@@ -1,4 +1,5 @@
 using HotChocolate;
+using HotChocolate.Authorization;
 using LastMile.TMS.Api.GraphQL.Inputs;
 using LastMile.TMS.Application.Depots.Commands;
 using LastMile.TMS.Application.Depots.DTOs;
@@ -9,6 +10,7 @@ namespace LastMile.TMS.Api.GraphQL.Mutations;
 [ExtendObjectType(OperationTypeNames.Mutation)]
 public class DepotMutation
 {
+    [Authorize(Roles = new[] { "OperationsManager", "Admin" })]
     public async Task<DepotDto> CreateDepot(
         CreateDepotInput input,
         [Service] ISender mediator = null!,
@@ -31,7 +33,10 @@ public class DepotMutation
         if (input.OperatingHours is not null)
         {
             operatingHours = input.OperatingHours.Select(h => new OperatingHoursDto(
-                h.DayOfWeek, h.OpenTime, h.ClosedTime, h.IsClosed)).ToList();
+                h.DayOfWeek,
+                ParseTime(h.OpenTime),
+                ParseTime(h.ClosedTime),
+                h.IsClosed)).ToList();
         }
 
         return await mediator.Send(
@@ -39,6 +44,7 @@ public class DepotMutation
             cancellationToken);
     }
 
+    [Authorize(Roles = new[] { "OperationsManager", "Admin" })]
     public async Task<DepotDto?> UpdateDepot(
         Guid id,
         UpdateDepotInput input,
@@ -66,7 +72,10 @@ public class DepotMutation
         if (input.OperatingHours is not null)
         {
             operatingHours = input.OperatingHours.Select(h => new OperatingHoursDto(
-                h.DayOfWeek, h.OpenTime, h.ClosedTime, h.IsClosed)).ToList();
+                h.DayOfWeek,
+                ParseTime(h.OpenTime),
+                ParseTime(h.ClosedTime),
+                h.IsClosed)).ToList();
         }
 
         return await mediator.Send(
@@ -74,11 +83,19 @@ public class DepotMutation
             cancellationToken);
     }
 
+    [Authorize(Roles = new[] { "OperationsManager", "Admin" })]
     public async Task<bool> DeleteDepot(
         Guid id,
         [Service] ISender mediator = null!,
         CancellationToken cancellationToken = default)
     {
         return await mediator.Send(new DeleteDepotCommand(id), cancellationToken);
+    }
+
+    private static TimeOnly? ParseTime(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+        return TimeOnly.Parse(value);
     }
 }
