@@ -68,7 +68,6 @@ LastMile.TMS.Api/
   Configuration/
   Controllers/
   Diagnostics/
-  Extensions/
   GraphQL/
   Program.cs
 ```
@@ -78,13 +77,13 @@ What belongs here:
 - `Configuration/*`
 - `Controllers/*`
 - `Diagnostics/*`
-- `Extensions/*`
 - `GraphQL/*`
 
 What does not belong here:
 - business rules
 - Entity Framework mappings
 - direct integration logic for email, geocoding, or background execution
+- duplicate REST and GraphQL endpoints for the same feature unless there is a concrete client need for both
 
 ### `LastMile.TMS.Application`
 This is the use-case layer and the main home of backend behavior.
@@ -457,6 +456,7 @@ Runtime notes:
 - Keep DTOs in the application layer, not the API layer.
 - Keep GraphQL inputs and types in `Api/GraphQL/<Domain>`.
 - Keep controllers and resolvers thin.
+- Prefer one canonical transport per feature. Do not maintain REST and GraphQL versions of the same use case without an active consumer.
 - Prefer constructor injection through DI registration modules.
 - Prefer configuration-bound options classes for infrastructure concerns.
 - Add or update architecture tests when dependency rules change intentionally.
