@@ -162,7 +162,7 @@ async function main() {
         Testing__SupportKey: supportKey,
         Email__DisableDelivery: "true",
         Frontend__BaseUrl: webUrl,
-        Cors__AllowedOrigins__0: webUrl,
+        Frontend__AllowedOrigins__0: webUrl,
         AdminCredentials__Email: "admin@lastmile.com",
         AdminCredentials__Password: "Admin@12345",
       }),

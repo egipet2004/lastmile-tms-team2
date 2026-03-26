@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { UserManagementClient } from "@/components/common/UserManagement";
+import { UserManagementClient } from "@/components/users";
 
 export const metadata: Metadata = {
   title: "Users - Last Mile TMS",

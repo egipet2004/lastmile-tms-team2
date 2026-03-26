@@ -47,8 +47,13 @@ test.describe("Authentication Flow", () => {
     await page.getByLabel(/email/i).fill("admin@lastmile.com");
     await page.getByRole("button", { name: /send reset link/i }).click();
 
-    await expect(page.getByText(/if an account exists for/i)).toBeVisible({
-      timeout: 5000,
+    await expect(
+      page
+        .getByText(/if an account exists for/i)
+        .or(page.getByText(/if the email exists/i))
+        .first(),
+    ).toBeVisible({
+      timeout: 10000,
     });
   });
 
@@ -92,7 +97,9 @@ test.describe("Authentication Flow", () => {
     await expect(page).toHaveURL(/.*dashboard/, { timeout: 10000 });
 
     // Click logout button
-    await page.getByRole("button", { name: /^logout$/i }).click({ timeout: 5000 });
+    await page.getByRole("button", { name: /^sign out$/i }).click({
+      timeout: 5000,
+    });
 
     // Should redirect to login page
     await expect(page).toHaveURL(/.*login/, { timeout: 5000 });

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getSession } from "next-auth/react";
-import { graphqlRequest } from "../graphql";
+import { graphqlRequest } from "../network/graphql-client";
 
 vi.mock("next-auth/react", () => ({
   getSession: vi.fn(),

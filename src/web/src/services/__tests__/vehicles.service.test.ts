@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { vehiclesService } from "../vehicles.service";
 import { VehicleStatus } from "../../types/vehicles";
 
-vi.mock("@/lib/graphql", () => ({
+vi.mock("@/lib/network/graphql-client", () => ({
   graphqlRequest: vi.fn(),
 }));
 
-import { graphqlRequest } from "@/lib/graphql";
+import { graphqlRequest } from "@/lib/network/graphql-client";
 
 const mockGraphql = graphqlRequest as ReturnType<typeof vi.fn>;
 

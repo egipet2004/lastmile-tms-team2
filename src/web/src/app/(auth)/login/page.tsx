@@ -7,10 +7,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { LoginForm } from "@/components/common/LoginForm";
+import { LoginForm } from "@/components/auth";
 
 export const metadata: Metadata = {
-  title: "Login — Last Mile TMS",
+  title: "Login вЂ” Last Mile TMS",
   description: "Login to Last Mile TMS delivery management system",
 };
 

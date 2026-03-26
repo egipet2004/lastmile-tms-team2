@@ -1,6 +1,6 @@
-import { graphqlRequest } from "@/lib/graphql";
-import { DRIVERS_LIST } from "@/graphql/operations";
-import { DriverOption } from "@/types/drivers";
+import { DRIVERS_LIST } from "@/graphql/drivers";
+import { graphqlRequest } from "@/lib/network/graphql-client";
+import type { DriverOption } from "@/types/drivers";
 import { mockDrivers } from "@/mocks/drivers.mock";
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_DATA === "true";
@@ -15,7 +15,7 @@ export const driversService = {
     }
 
     const variables: Record<string, unknown> = {};
-    // Empty string is not a valid GraphQL UUID literal — omit variable to mean "no filter".
+    // Empty string is not a valid GraphQL UUID literal вЂ” omit variable to mean "no filter".
     if (depotId !== undefined && depotId.trim() !== "") {
       variables.depotId = depotId;
     }

@@ -9,7 +9,8 @@ import {
   useDeleteVehicle,
   vehicleKeys,
 } from "../vehicles";
-import type { PaginatedResponse, Vehicle } from "../../types/vehicles";
+import type { PaginatedResponse } from "../../types/api";
+import type { Vehicle } from "../../types/vehicles";
 import { VehicleStatus } from "../../types/vehicles";
 import * as vehiclesService from "../../services/vehicles.service";
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   getDashboardNavItems,
   isDashboardNavActive,
-} from "@/lib/dashboard-nav";
+} from "@/lib/navigation/dashboard-nav";
 
 describe("dashboard navigation", () => {
   it("shows admin-only links only for admins", () => {

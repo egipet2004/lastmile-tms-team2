@@ -1,11 +1,10 @@
-import { graphqlRequest } from "@/lib/graphql";
-import { routeStatusToGraphQL } from "@/graphql/enum-maps";
 import {
-  MUTATION_CREATE_ROUTE,
+  CREATE_ROUTE,
   PAGINATED_ROUTES,
   ROUTE_BY_ID,
   VEHICLE_ROUTE_HISTORY,
-} from "@/graphql/operations";
+} from "@/graphql/routes";
+import { graphqlRequest } from "@/lib/network/graphql-client";
 import {
   Route,
   CreateRouteRequest,
@@ -27,6 +26,9 @@ const gqlStatusToRouteStatus: Record<string, RouteStatus> = {
   COMPLETED: RouteStatus.Completed,
   CANCELLED: RouteStatus.Cancelled,
 };
+
+const routeStatusToGraphQL = (status: RouteStatus): string =>
+  (["PLANNED", "IN_PROGRESS", "COMPLETED", "CANCELLED"] as const)[status];
 
 function mapRouteStatus(s: unknown): RouteStatus {
   if (typeof s === "number" && s >= 0 && s <= 3) return s as RouteStatus;
@@ -199,7 +201,7 @@ export const routesService = {
     }
 
     const res = await graphqlRequest<{ createRoute: unknown }>(
-      MUTATION_CREATE_ROUTE,
+      CREATE_ROUTE,
       {
         input: {
           vehicleId: data.vehicleId,

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { DashboardOverviewClient } from "@/components/common/DashboardOverview/DashboardOverviewClient";
+import { DashboardOverviewClient } from "@/components/dashboard/dashboard-overview";
 import { auth } from "@/lib/auth";
 
 export const metadata: Metadata = {

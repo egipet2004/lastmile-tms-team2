@@ -18,6 +18,7 @@ async function typeIntoField(locator: Locator, value: string) {
 }
 
 test.describe("User Management CRUD", () => {
+  test.describe.configure({ mode: "serial" });
   let fixture: UserManagementFixture;
 
   test.beforeEach(async ({ page, request }) => {

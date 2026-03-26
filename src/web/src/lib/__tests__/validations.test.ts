@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { loginSchema } from "../validations";
+import { loginSchema } from "../validation/auth";
 
 describe("loginSchema", () => {
   it("should validate correct login data", () => {

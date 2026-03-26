@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { getErrorMessage } from "../error-message";
+import { getErrorMessage } from "../network/error-message";
 
 describe("getErrorMessage", () => {
   it("returns Error.message", () => {

@@ -2,12 +2,12 @@ import { auth } from "@/lib/auth";
 import {
   DashboardHeader,
   DashboardSidebar,
-} from "@/components/common/DashboardHeader";
+} from "@/components/layout";
 import {
   dashboardContentMaxClass,
   dashboardGutterXClass,
   dashboardPageVerticalClass,
-} from "@/lib/dashboard-layout";
+} from "@/lib/navigation/dashboard-layout";
 import { redirect } from "next/navigation";
 import { Tooltip } from "radix-ui";
 import { cn } from "@/lib/utils";

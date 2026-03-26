@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ResetPasswordForm } from "@/components/common/ResetPasswordForm";
+import { ResetPasswordForm } from "@/components/auth";
 
 export const metadata: Metadata = {
   title: "Reset Password - Last Mile TMS",

@@ -5,7 +5,7 @@ import {
   dayOfWeekToIndex,
   normalizeDepot,
   serializeDepotOperatingHours,
-} from "../depot-operating-hours";
+} from "../depots/operating-hours";
 
 describe("depot operating hours helpers", () => {
   it("serializes numeric day indexes to GraphQL enum values", () => {

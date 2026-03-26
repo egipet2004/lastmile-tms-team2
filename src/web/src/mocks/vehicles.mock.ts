@@ -1,6 +1,6 @@
+import type { PaginatedResponse } from "@/types/api";
 import {
   Vehicle,
-  PaginatedResponse,
   VehicleStatus,
   VehicleType,
 } from "@/types/vehicles";
