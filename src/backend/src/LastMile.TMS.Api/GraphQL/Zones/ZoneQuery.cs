@@ -1,25 +1,20 @@
 using HotChocolate;
 using LastMile.TMS.Application.Zones.DTOs;
-using LastMile.TMS.Application.Zones.Queries;
-using MediatR;
+using LastMile.TMS.Application.Zones.Reads;
 
 namespace LastMile.TMS.Api.GraphQL.Zones;
 
 [ExtendObjectType(OperationTypeNames.Query)]
 public sealed class ZoneQuery
 {
-    public async Task<List<ZoneDto>> GetZones(
-        [Service] ISender mediator = null!,
-        CancellationToken cancellationToken = default)
-    {
-        return await mediator.Send(new GetAllZonesQuery(), cancellationToken);
-    }
+    public Task<IReadOnlyList<ZoneDto>> GetZones(
+        [Service] IZoneReadService readService = null!,
+        CancellationToken cancellationToken = default) =>
+        readService.GetZonesAsync(cancellationToken);
 
-    public async Task<ZoneDto?> GetZone(
+    public Task<ZoneDto?> GetZone(
         Guid id,
-        [Service] ISender mediator = null!,
-        CancellationToken cancellationToken = default)
-    {
-        return await mediator.Send(new GetZoneByIdQuery(id), cancellationToken);
-    }
+        [Service] IZoneReadService readService = null!,
+        CancellationToken cancellationToken = default) =>
+        readService.GetZoneByIdAsync(id, cancellationToken);
 }

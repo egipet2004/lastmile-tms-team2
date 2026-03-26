@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Hangfire;
 using Hangfire.PostgreSql;
 using LastMile.TMS.Api.Diagnostics;
@@ -37,7 +38,11 @@ public static class ServiceCollectionExtensions
         services.AddProblemDetails();
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
-        services.AddControllers();
+        services.AddControllers()
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+            });
         services.AddGraphQLServer()
             .AddQueryType<Query>()
             .AddMutationType<Mutation>()
@@ -70,6 +75,7 @@ public static class ServiceCollectionExtensions
             .AddType<RegisterParcelInputType>()
             .AddFiltering()
             .AddSorting()
+            .AddProjections()
             .AddAuthorization()
             .AddErrorFilter<DomainExceptionErrorFilter>()
             .AddErrorFilter<GraphQLErrorFilter>();

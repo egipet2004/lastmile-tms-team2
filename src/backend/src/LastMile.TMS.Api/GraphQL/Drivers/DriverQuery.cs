@@ -1,8 +1,7 @@
 using HotChocolate;
 using HotChocolate.Authorization;
-using LastMile.TMS.Application.Drivers.DTOs;
-using LastMile.TMS.Application.Drivers.Queries;
-using MediatR;
+using HotChocolate.Data;
+using LastMile.TMS.Application.Drivers.Reads;
 
 namespace LastMile.TMS.Api.GraphQL.Drivers;
 
@@ -10,9 +9,9 @@ namespace LastMile.TMS.Api.GraphQL.Drivers;
 public sealed class DriverQuery
 {
     [Authorize(Roles = new[] { "OperationsManager", "Admin", "Dispatcher" })]
-    public Task<IReadOnlyList<DriverListItemDto>> GetDrivers(
+    [UseProjection]
+    public IQueryable<DriverReadModel> GetDrivers(
         Guid? depotId = null,
-        [Service] ISender mediator = null!,
-        CancellationToken cancellationToken = default) =>
-        mediator.Send(new GetDriversQuery(depotId), cancellationToken);
+        [Service] IDriverReadService readService = null!) =>
+        readService.GetDrivers(depotId);
 }

@@ -1,7 +1,9 @@
 using HotChocolate;
 using HotChocolate.Authorization;
+using HotChocolate.Data;
 using LastMile.TMS.Application.Depots.DTOs;
 using LastMile.TMS.Application.Depots.Queries;
+using LastMile.TMS.Application.Depots.Reads;
 using MediatR;
 
 namespace LastMile.TMS.Api.GraphQL.Depots;
@@ -10,12 +12,11 @@ namespace LastMile.TMS.Api.GraphQL.Depots;
 public sealed class DepotQuery
 {
     [Authorize(Roles = new[] { "OperationsManager", "Admin", "Dispatcher" })]
-    public async Task<IReadOnlyList<DepotDto>> GetDepots(
-        [Service] ISender mediator = null!,
-        CancellationToken cancellationToken = default)
-    {
-        return await mediator.Send(new GetAllDepotsQuery(), cancellationToken);
-    }
+    [UseSorting]
+    [UseFiltering]
+    public IQueryable<DepotDto> GetDepots(
+        [Service] IDepotReadService readService = null!) =>
+        readService.GetDepots();
 
     [Authorize(Roles = new[] { "OperationsManager", "Admin", "Dispatcher" })]
     public Task<DepotDto?> GetDepot(
