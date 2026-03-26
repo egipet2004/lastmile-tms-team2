@@ -1,224 +1,407 @@
-# Architecture Guide — LastMile TMS
+# Web Architecture Guide
 
-> Team document. Describes the frontend structure, rules, and standards.
+This document defines the target architecture for `src/web/src`.
+It describes the structure we actively maintain. Old layouts and deprecated import paths are not part of the architecture, even if they still appear in git history.
 
----
+## Core Principles
+
+1. Organize by layer first, then by domain inside the layer.
+2. Use backend domain names as the canonical vocabulary:
+   `depots`, `drivers`, `parcels`, `routes`, `users`, `vehicles`, `zones`.
+3. Keep `app/` thin. Routes compose pages; they do not own feature logic.
+4. Keep data flow consistent:
+   page or component -> query hook -> service -> GraphQL client.
+5. Keep `components/ui` primitive-only. Business behavior belongs elsewhere.
+6. Keep `lib/` for shared non-React helpers, validation, navigation, networking, and labels.
+7. Keep `hooks/` for generic React or browser hooks only.
+8. Prefer explicit naming over catch-all folders such as `common`, `helpers`, or `misc`.
 
 ## Stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16, App Router |
-| UI | React 19, shadcn/ui, Tailwind CSS 4 |
-| Server state | TanStack Query |
-| Client state | React Context + hooks |
-| Forms | react-hook-form + Zod |
-| Typing | TypeScript, manual typing |
-| Authentication | OAuth 2.0 (OpenIddict), access + refresh token |
-| Theme | next-themes, system (auto by device) |
-| Testing | Vitest (unit), Playwright (e2e) |
-| Linting | ESLint + Prettier |
+- Framework: Next.js 16 App Router
+- UI: React 19, Tailwind CSS 4, shadcn primitives
+- Server state: TanStack Query
+- Forms: react-hook-form + Zod
+- Auth: NextAuth credentials flow against OpenIddict
+- Tests: Vitest + Playwright
 
----
+## Canonical Folder Tree
 
-## Folder Structure
-
-```
+```text
 src/
-├── app/                        # Next.js App Router
-│   ├── (auth)/                 # Public routes (login)
-│   ├── (dashboard)/            # Protected routes (orders, drivers, users)
-│   ├── layout.tsx              # Root layout — providers, theme
-│   └── globals.css             # CSS variables, base styles
-│
-├── components/
-│   ├── ui/                     # shadcn/ui — do not edit
-│   ├── common/                 # Our components (DataTable, PageHeader…)
-│   └── layout/                 # Sidebar, Header, ThemeProvider
-│
-├── context/                    # React Context
-│   ├── AuthContext.tsx          # User, tokens, roles
-│   └── UIContext.tsx            # UI state (sidebar, modals)
-│
-├── hooks/                      # Custom hooks (useDebounce, usePagination…)
-├── services/                   # API client and entity services
-├── queries/                    # TanStack Query hooks per entity
-├── types/                      # TypeScript types per entity
-├── lib/                        # Utilities, Zod schemas, constants
-└── middleware.ts                # Route protection, redirect logic
+  app/
+    (auth)/
+    (dashboard)/
+    admin/
+    api/
+    layout.tsx
+    page.tsx
+    providers.tsx
+
+  components/
+    auth/
+    dashboard/
+    depots/
+    detail/
+    feedback/
+    form/
+    layout/
+    list/
+    routes/
+    ui/
+    users/
+    vehicles/
+    zones/
+
+  graphql/
+    depots.ts
+    drivers.ts
+    parcels.ts
+    routes.ts
+    users.ts
+    vehicles.ts
+    zones.ts
+
+  hooks/
+    use-debounce.ts
+    use-floating-dropdown-position.ts
+
+  lib/
+    auth.ts
+    utils.ts
+    depots/
+    forms/
+    labels/
+    navigation/
+    network/
+    parcels/
+    query/
+    toast/
+    validation/
+
+  mocks/
+  queries/
+  services/
+  types/
+  proxy.ts
 ```
 
----
+## Layer Contracts
 
-## Routing — App Router
+### `app/`
 
-We use Next.js App Router. Routes are split into two groups via bracket notation:
+Purpose:
+- route files
+- layouts
+- top-level providers
+- redirects and route entry points
 
-- `(auth)/` — public pages. Accessible without a token.
-- `(dashboard)/` — protected pages. Redirects to `/login` without a token.
+Rules:
+- keep route files thin
+- move large tables, dialogs, forms, and detail pages into `components/`
+- auth and dashboard route groups own composition, not business logic
+- legacy URLs may redirect from `app/admin/*` into canonical dashboard routes
 
-Each group has its own `layout.tsx`. Route protection is implemented via `middleware.ts` — it checks for an `access_token` in cookies and redirects when necessary.
+### `components/`
 
-By default, all components are Server Components. The `"use client"` directive is added only where hooks, events, or browser APIs are needed.
+Purpose:
+- reusable UI composed for this product
+- feature and domain presentation
+- page-level client components extracted out of `app/`
 
----
+Structure:
+- `components/ui`: shadcn-style primitives only
+- `components/form`: reusable custom inputs and selectors
+- `components/feedback`: alerts and query-state feedback
+- `components/list`: list/table/page-shell building blocks
+- `components/detail`: detail/edit page shells and form scaffolding
+- `components/layout`: app chrome such as sidebar and header
+- `components/auth`, `dashboard`, `depots`, `routes`, `users`, `vehicles`, `zones`: domain-specific components
 
-## Components
+Rules:
+- no domain logic in `components/ui`
+- no new `components/common`
+- shared components should move into the narrowest folder that matches their purpose
+- if a component knows about a specific entity, keep it under that entity folder
 
-`components/ui/` — shadcn files. This is vendor code: it gets overwritten when shadcn is updated. Do not edit directly.
+### `queries/`
 
-`components/common/` — our components. They use `ui/` as building blocks, adding business logic and custom props. Each component is a separate folder containing the component file, a types file, and an `index.ts`.
+Purpose:
+- TanStack Query hooks
+- query keys
+- mutations with cache invalidation
 
-Customizing the appearance of shadcn components is done exclusively via CSS variables in `globals.css`, not by editing component files.
+Rules:
+- components call queries, not services directly, unless there is a strong non-React reason
+- query modules are domain-based: `queries/users.ts`, `queries/zones.ts`, etc.
+- mutation toast metadata belongs here or in shared query helpers, not in page files
 
----
+### `services/`
 
-## State Management
+Purpose:
+- domain API operations
+- request and response mapping
+- GraphQL variable construction
+- domain-level normalization
 
-**Server data** → TanStack Query. Each entity has its own file in `queries/` with a key factory (`orderKeys`, `driverKeys`…).
+Rules:
+- services do not render UI
+- services do not import React
+- services import GraphQL documents from `graphql/`
+- enum serialization and mapping belong in the owning service, not in a shared GraphQL helper
 
-**Global client state** → React Context. Only two contexts:
-- `AuthContext` — user, tokens, login/logout/refresh methods
-- `UIContext` — UI state (sidebar, modals)
+### `graphql/`
 
-**Local state** → `useState` / `useReducer` inside the component.
+Purpose:
+- document strings only
 
-**Forms** → react-hook-form + Zod. Zod schemas live in `lib/validations.ts`.
+Rules:
+- one file per domain
+- no React, no fetch logic, no enum mapping
+- examples: `graphql/vehicles.ts`, `graphql/users.ts`
 
----
+### `hooks/`
 
-## TypeScript Types
+Purpose:
+- generic hooks that are not tied to one domain
 
-Types are written manually. Contracts are agreed with the backend via Swagger UI (`/swagger`).
+Rules:
+- keep only reusable React or browser hooks here
+- entity data hooks belong in `queries/`, not `hooks/`
+- deprecated: `lib/hooks/*`
 
-- `types/api.ts` — shared wrappers: `PaginatedResponse<T>`, `ApiError`
-- `types/auth.ts` — tokens, user, OAuth requests
-- `types/orders.ts`, `types/drivers.ts`, etc. — entity types including DTOs
+### `lib/`
 
-Rules: no `any`, use `unknown` when the type is uncertain. Request DTOs (`CreateOrderDto`) are always kept separate from response models (`Order`).
+Purpose:
+- cross-cutting helpers that are not components and not query hooks
 
----
+Allowed subfolders:
+- `lib/network/`: low-level network and GraphQL client helpers
+- `lib/query/`: query client and mutation integration helpers
+- `lib/navigation/`: dashboard nav and layout constants
+- `lib/validation/`: Zod schemas and field validators
+- `lib/labels/`: shared label, badge, and display helpers
+- `lib/forms/`: shared option builders and non-visual form helpers
+- `lib/depots/`: depot-specific pure helpers shared across layers
+- `lib/parcels/`: parcel-specific pure helpers shared across layers
+- `lib/toast/`: application toast wrapper
 
-## API Layer
+Root exceptions:
+- `lib/auth.ts`
+- `lib/utils.ts`
 
-A single fetch client in `services/api.ts`. Automatically attaches the `Authorization: Bearer` header. On receiving a `401`, it attempts to refresh the token via the refresh grant — on success it retries the request; on failure it clears the tokens and redirects to `/login`.
+Rules:
+- no React hooks in `lib/`
+- do not put entity data access in `lib/api/*`
+- do not recreate catch-all files like `validations.ts`
 
-Entity services (`orders.service.ts`, `drivers.service.ts`) use this client and know nothing about authentication.
+### `types/`
 
-The base URL is taken from `NEXT_PUBLIC_API_URL` (`.env.local`).
+Purpose:
+- domain contracts and shared transport types
 
----
+Rules:
+- file names use backend domain terms
+- shared transport wrappers live in `types/api.ts`
+- shared non-visual form types live in `types/forms.ts`
+- UI components must not be the source of shared domain types
 
-## Authentication
+## Allowed Import Direction
 
-OAuth 2.0 via OpenIddict on the backend. The frontend uses the password grant for login and the refresh token grant for session renewal.
+Preferred direction:
 
-- `access_token` — stored in localStorage, short-lived
-- `refresh_token` — stored in an httpOnly cookie (preferred) or localStorage
-- The entire flow is encapsulated in `AuthContext` and `auth.service.ts`
-
----
-
-## Theme and Colors
-
-The theme automatically adapts to the device's system settings (`defaultTheme="system"`). Manual switching is available via `ThemeToggle` in the header.
-
-**Accent color:** blue (`--primary: 217 91% 60%`)
-
-| Token | Light | Dark | Purpose |
-|---|---|---|---|
-| `--background` | `#ffffff` | `#09090b` | Page background |
-| `--foreground` | `#18181b` | `#fafafa` | Primary text |
-| `--primary` | `#2563eb` | `#3b82f6` | Buttons, links, accents |
-| `--muted` | `#f4f4f5` | `#18181b` | Secondary surfaces |
-| `--border` | `#e4e4e7` | `#27272a` | Borders, dividers |
-| `--destructive` | `#ef4444` | `#dc2626` | Errors, deletion |
-
-Status colors (badges, order statuses):
-
-| Status | Light | Dark |
-|---|---|---|
-| Active | blue background + blue text | dark blue + light blue |
-| Completed | green background + green text | dark green + light green |
-| Pending | yellow background + amber text | dark amber + yellow |
-| Cancelled | red background + red text | dark red + pink |
-
-All variables are declared in `globals.css` inside `:root {}` (light) and `.dark {}` (dark) blocks.
-
----
-
-## Testing
-
-**Vitest** — unit tests. Coverage includes: all utilities from `lib/`, custom hooks (`@testing-library/react`), services.
-
-**Playwright** — e2e. Required coverage: auth flow (login, redirect, logout), core user scenarios (order creation, etc.).
-
-Tests live alongside the file being tested in a `__tests__/` folder; e2e tests live in the root `e2e/` folder.
-
----
-
-## Linting and Formatting
-
-ESLint with `next/core-web-vitals` + `next/typescript` rules. Additionally enabled: `no-console: warn`, `no-explicit-any: error`, `import/order: error` (auto-sort imports).
-
-Prettier: `semi: true`, `singleQuote: false`, `tabWidth: 2`, `trailingComma: es5`, `printWidth: 100`.
-
-Run manually before committing: `pnpm lint && pnpm format`.
-
----
-
-## Team Conventions
-
-| Rule | Standard |
-|---|---|
-| Components | PascalCase, named export |
-| Hooks | `use` prefix, camelCase |
-| Page files | kebab-case |
-| Component files | PascalCase |
-| Imports | `@/` alias for `src/` |
-| Server vs Client | Server by default, `"use client"` only when necessary |
-| Types | no `any`, DTOs are separate from models |
-| Forms | react-hook-form + Zod everywhere |
-| API errors | 401 is always handled via the refresh flow |
-
----
-
-## Backend — Reference
-
-**Technologies:** .NET 10, ASP.NET Core, PostgreSQL, Redis, OpenIddict, MediatR (CQRS), FluentValidation, Hangfire, Serilog, SignalR.
-
-**Structure:**
-```
-LastMile.TMS.Api            → Controllers, Program.cs
-LastMile.TMS.Application    → CQRS, Validators
-LastMile.TMS.Domain         → Entities, Value Objects
-LastMile.TMS.Infrastructure → OpenIddict, SignalR, Hangfire
-LastMile.TMS.Persistence    → EF Core, PostgreSQL
+```text
+app -> components -> queries -> services -> graphql
+                         |          |
+                         v          v
+                        types      lib
 ```
 
-**Key endpoints:**
+Allowed:
+- `app` may import `components`, `lib`, `types`, and `auth`
+- `components` may import `queries`, `hooks`, `lib`, `types`, and `ui` primitives
+- `queries` may import `services`, `types`, and `lib/query`
+- `services` may import `graphql`, `lib/network`, `lib/*` pure helpers, and `types`
 
-| Method | Path | Description |
-|---|---|---|
-| POST | `/connect/token` | OAuth 2.0 (password + refresh grant) |
-| GET | `/api/users/me` | Current user |
-| GET | `/swagger` | Swagger UI (dev only) |
-| GET | `/hangfire` | Background jobs (dev only) |
+Do not do this:
+- `services` importing `queries`
+- `graphql` importing `services`
+- `components/ui` importing domain types or domain services
+- `hooks/` duplicating entity-fetching behavior from `queries/`
+- `lib/` depending on component implementation types
 
----
+## Data Flow
 
-## Running the Project
+Standard request flow:
 
-```bash
-# Backend
-cd src/backend && dotnet run --project src/LastMile.TMS.Api
-# → "applicationUrl": "https://localhost:61615;http://localhost:61616"
+1. A page component or client component reads route params and UI state.
+2. The component calls a domain hook from `queries/`.
+3. The query hook calls a function from `services/`.
+4. The service builds variables and calls the GraphQL client.
+5. The service normalizes the response into app-facing types.
+6. The query hook manages caching and invalidation.
+7. The component renders UI and mutation states.
 
-# Frontend
-cd src/web && pnpm install && pnpm dev
-# → http://localhost:3000
+This flow applies to all entities, including `depots` and `zones`.
 
-# Full stack
-docker-compose up -d
-# PostgreSQL + Redis + API + Frontend + Caddy
-```
+## Auth and Runtime Flow
+
+- `app/providers.tsx` wires `SessionProvider`, `QueryClientProvider`, toasts, and React Query Devtools.
+- `lib/auth.ts` owns NextAuth configuration and token refresh behavior.
+- `proxy.ts` guards protected routes and redirects unauthenticated users to `/login`.
+- `app/(auth)` contains public auth screens.
+- `app/(dashboard)` contains protected routes and dashboard layout composition.
+
+## Naming Rules
+
+- Use backend names for files and modules: `users`, not `user-management`; `zones`, not `zone`.
+- Use kebab-case for file names except where framework conventions require otherwise.
+- Keep page entrypoints named `page.tsx`; keep extracted component files descriptive, such as `vehicles-page.tsx` or `route-detail-page.tsx`.
+- Prefer singular component names and plural domain module names.
+
+## What Belongs Where
+
+### `components/ui`
+
+Belongs here:
+- `button.tsx`
+- `card.tsx`
+- `input.tsx`
+- `label.tsx`
+- future shadcn-generated primitives
+
+Does not belong here:
+- date-time pickers
+- filter dropdowns
+- domain-specific status filters
+- query error wrappers
+- table cells with business meaning
+
+### `components/form`
+
+Belongs here:
+- reusable custom inputs
+- dropdown wrappers
+- listbox-based selectors
+- numeric input controls
+
+Examples:
+- `date-time-picker.tsx`
+- `select-dropdown.tsx`
+- `weight-capacity-input.tsx`
+
+### `components/feedback`
+
+Belongs here:
+- query and mutation error display
+- empty-state or retry shells that are presentation-focused
+
+### `components/list`
+
+Belongs here:
+- list/table shells
+- pagination controls
+- reusable data-table helpers
+- generic table cells such as overflow tooltip rendering
+
+### Domain component folders
+
+Belongs here:
+- entity-specific filters
+- entity page clients
+- entity forms and dialogs
+- row actions tied to one domain
+
+Examples:
+- vehicle status filter -> `components/vehicles/`
+- route status filter -> `components/routes/`
+- user management page -> `components/users/`
+
+### `queries`
+
+Belongs here:
+- `useUsers`
+- `useZones`
+- query keys
+- mutation invalidation rules
+
+Does not belong here:
+- raw GraphQL document strings
+- presentational toast components
+
+### `services`
+
+Belongs here:
+- `users.service.ts`
+- `zones.service.ts`
+- domain-specific mapping helpers
+
+Does not belong here:
+- React hooks
+- JSX
+- query cache logic
+
+### `graphql`
+
+Belongs here:
+- `USERS_LIST`
+- `CREATE_VEHICLE`
+- `ZONE_BY_ID`
+
+Does not belong here:
+- `graphqlRequest`
+- enum conversion helpers
+- domain normalization
+
+### `lib`
+
+Belongs here:
+- `lib/network/graphql-client.ts`
+- `lib/query/query-client.ts`
+- `lib/navigation/dashboard-nav.ts`
+- `lib/validation/users.ts`
+- `lib/forms/depots.ts`
+- `lib/depots/operating-hours.ts`
+
+Does not belong here:
+- entity query hooks
+- page components
+- domain service modules
+
+## Deprecated Structure
+
+These paths are deprecated and must not be reintroduced:
+
+- `components/common`
+- `lib/hooks`
+- `lib/api`
+- `graphql/operations.ts`
+- `graphql/enum-maps.ts`
+- `lib/validations.ts`
+- domain names that drift from backend vocabulary such as `user-management.ts` or `zone.ts`
+
+## Testing Rules
+
+- Unit and component tests live next to the code they cover or in the layer test folder that already owns that module.
+- Every move or rename must keep tests aligned with the new canonical import path.
+- Minimum validation for structural refactors:
+  - `npm run build`
+  - `npm run test:run`
+- E2E coverage should protect the main auth and dashboard flows:
+  - login
+  - navigation
+  - vehicles
+  - users
+  - depots and zones when their CRUD flow changes
+
+## Refactor Checklist
+
+Use this checklist when adding or moving code:
+
+1. Pick the domain-first name that matches the backend.
+2. Put route composition in `app/` and feature logic in `components/`.
+3. Put data fetching in `queries/`, not `hooks/`.
+4. Put API mapping in `services/`, not `components/`.
+5. Put GraphQL strings in the matching `graphql/<domain>.ts`.
+6. Keep shared types in `types/`, not inside visual components.
+7. If a module does not fit a contract, move it before adding more code around it.

@@ -1,3 +1,5 @@
+import type { PaginatedResponse } from "@/types/api";
+
 export enum VehicleType {
   Van = 0,
   Car = 1,
@@ -44,12 +46,4 @@ export interface UpdateVehicleRequest {
   weightCapacity: number;
   status: VehicleStatus;
   depotId: string;
-}
-
-export interface PaginatedResponse<T> {
-  items: T[];
-  totalCount: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
 }

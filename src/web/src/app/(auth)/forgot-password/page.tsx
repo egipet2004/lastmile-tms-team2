@@ -6,7 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ForgotPasswordForm } from "@/components/common/ForgotPasswordForm";
+import { ForgotPasswordForm } from "@/components/auth";
 
 export const metadata: Metadata = {
   title: "Forgot Password - Last Mile TMS",

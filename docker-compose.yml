@@ -3,6 +3,8 @@ services:
     image: caddy:2-alpine
     ports:
       - "80:80"
+    env_file:
+      - ./src/backend/src/LastMile.TMS.Api/.env
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     depends_on:
@@ -85,6 +87,7 @@ services:
     image: datalust/seq:latest
     environment:
       ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_NOAUTHENTICATION: "true"
     volumes:
       - seqdata:/data
 

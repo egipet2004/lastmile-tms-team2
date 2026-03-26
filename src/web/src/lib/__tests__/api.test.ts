@@ -4,7 +4,7 @@ vi.mock("next-auth/react", () => ({
   getSession: vi.fn(() => Promise.resolve(null)),
 }));
 
-import { apiFetch, parseApiErrorMessage } from "../api";
+import { apiFetch, parseApiErrorMessage } from "../network/api";
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;

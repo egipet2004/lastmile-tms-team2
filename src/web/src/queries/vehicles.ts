@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import type { MutationToastMeta } from "@/lib/mutation-toast-meta";
+import type { MutationToastMeta } from "@/lib/query/mutation-toast-meta";
 import { vehiclesService } from "@/services/vehicles.service";
 import {
   CreateVehicleRequest,

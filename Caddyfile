@@ -2,6 +2,12 @@
 	auto_https off
 }
 
+(dashboard_auth) {
+	basic_auth {
+		{$DASHBOARD__USERNAME} {$DASHBOARD__PASSWORDHASH}
+	}
+}
+
 :80 {
 	# NextAuth endpoints (must be before /api/*)
 	handle /api/auth/* {
@@ -40,11 +46,14 @@
 
 	# Hangfire dashboard
 	handle /hangfire* {
+		import dashboard_auth
 		reverse_proxy api:8080
 	}
 
 	# Seq log viewer
+	redir /seq /seq/
 	handle /seq/* {
+		import dashboard_auth
 		uri strip_prefix /seq
 		reverse_proxy seq:80
 	}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { messageFromGraphQLError } from "../graphql";
+import { messageFromGraphQLError } from "../network/graphql-client";
 
 describe("messageFromGraphQLError", () => {
   it("returns normal messages as-is", () => {

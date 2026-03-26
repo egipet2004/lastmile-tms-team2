@@ -1,6 +1,6 @@
 using DotNetEnv;
 using Hangfire;
-using LastMile.TMS.Api;
+using LastMile.TMS.Api.Configuration;
 using LastMile.TMS.Application;
 using LastMile.TMS.Infrastructure;
 using LastMile.TMS.Persistence;
@@ -52,7 +52,7 @@ try
 
     if (!disableExternalInfrastructure)
     {
-        app.UseHangfireDashboard("/hangfire");
+        app.UseHangfireDashboard("/hangfire", HangfireDashboardConfiguration.CreateOptions(builder.Configuration));
     }
 
     app.MapControllers();

@@ -1,23 +1,19 @@
-import { graphqlRequest } from "@/lib/graphql";
 import {
-  vehicleStatusToGraphQL,
-  vehicleTypeToGraphQL,
-} from "@/graphql/enum-maps";
-import {
-  MUTATION_CREATE_VEHICLE,
-  MUTATION_DELETE_VEHICLE,
-  MUTATION_UPDATE_VEHICLE,
+  CREATE_VEHICLE,
+  DELETE_VEHICLE,
   PAGINATED_VEHICLES,
+  UPDATE_VEHICLE,
   VEHICLE_BY_ID,
-} from "@/graphql/operations";
+} from "@/graphql/vehicles";
+import { graphqlRequest } from "@/lib/network/graphql-client";
 import {
   Vehicle,
   CreateVehicleRequest,
   UpdateVehicleRequest,
-  PaginatedResponse,
   VehicleStatus,
   VehicleType,
 } from "@/types/vehicles";
+import type { PaginatedResponse } from "@/types/api";
 import {
   getMockVehiclesPaginated,
   getMockVehicleById,
@@ -37,6 +33,12 @@ const gqlTypeToVehicleType: Record<string, VehicleType> = {
   CAR: VehicleType.Car,
   BIKE: VehicleType.Bike,
 };
+
+const vehicleStatusToGraphQL = (status: VehicleStatus): string =>
+  (["AVAILABLE", "IN_USE", "MAINTENANCE", "RETIRED"] as const)[status];
+
+const vehicleTypeToGraphQL = (type: VehicleType): string =>
+  (["VAN", "CAR", "BIKE"] as const)[type];
 
 function mapVehicleStatus(v: unknown): VehicleStatus {
   if (typeof v === "number" && v >= 0 && v <= 3) return v as VehicleStatus;
@@ -152,7 +154,7 @@ export const vehiclesService = {
     }
 
     const res = await graphqlRequest<{ createVehicle: unknown }>(
-      MUTATION_CREATE_VEHICLE,
+      CREATE_VEHICLE,
       {
         input: {
           registrationPlate: data.registrationPlate,
@@ -181,7 +183,7 @@ export const vehiclesService = {
     }
 
     const res = await graphqlRequest<{ updateVehicle: unknown | null }>(
-      MUTATION_UPDATE_VEHICLE,
+      UPDATE_VEHICLE,
       {
         id,
         input: {
@@ -205,7 +207,7 @@ export const vehiclesService = {
     }
 
     const res = await graphqlRequest<{ deleteVehicle: boolean }>(
-      MUTATION_DELETE_VEHICLE,
+      DELETE_VEHICLE,
       { id }
     );
     return res.deleteVehicle;

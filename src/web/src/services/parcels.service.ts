@@ -1,6 +1,6 @@
-import { graphqlRequest } from "@/lib/graphql";
-import { PARCELS_FOR_ROUTE } from "@/graphql/operations";
-import { ParcelOption } from "@/types/parcels";
+import { PARCELS_FOR_ROUTE } from "@/graphql/parcels";
+import { graphqlRequest } from "@/lib/network/graphql-client";
+import type { ParcelOption } from "@/types/parcels";
 import { mockParcels } from "@/mocks/parcels.mock";
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_DATA === "true";
