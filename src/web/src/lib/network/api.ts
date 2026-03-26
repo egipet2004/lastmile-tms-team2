@@ -1,5 +1,3 @@
-import { getSession } from "next-auth/react";
-
 export function apiBaseUrl(): string {
   const url = process.env.NEXT_PUBLIC_API_URL;
   if (!url) {
@@ -86,30 +84,4 @@ export async function parseApiErrorMessage(res: Response): Promise<string> {
   }
 
   return trimmed.length > 500 ? `${trimmed.slice(0, 500)}…` : trimmed;
-}
-
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const session = await getSession();
-  const headers = new Headers(init?.headers);
-
-  if (!headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-
-  const token = session?.accessToken;
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-
-  const res = await fetch(`${apiBaseUrl()}${path}`, {
-    ...init,
-    headers,
-  });
-
-  if (!res.ok) {
-    const message = await parseApiErrorMessage(res);
-    throw new Error(message);
-  }
-
-  return res.json() as Promise<T>;
 }

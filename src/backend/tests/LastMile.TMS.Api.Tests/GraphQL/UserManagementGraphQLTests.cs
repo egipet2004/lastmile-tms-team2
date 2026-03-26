@@ -584,11 +584,15 @@ public class UserManagementGraphQLTests(CustomWebApplicationFactory factory)
             .Should()
             .BeFalse();
 
-        var request = new HttpRequestMessage(HttpMethod.Get, "/api/users/me");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", userToken);
-
-        var response = await _client.SendAsync(request);
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        // Verify the deactivated user's token no longer grants access.
+        // GraphQL returns 200 but the response contains errors for unauthorized requests.
+        var blockedDocument = await PostGraphQLExpectAuthErrorAsync(
+            """
+            query { user(id: "00000000-0000-0000-0000-000000000000") { id } }
+            """,
+            userToken);
+        blockedDocument.RootElement.TryGetProperty("errors", out var authErrors)
+            .Should().BeTrue("deactivated user's token should be rejected");
     }
 
     [Fact]
@@ -946,6 +950,22 @@ public class UserManagementGraphQLTests(CustomWebApplicationFactory factory)
                 request.Headers.TryAddWithoutValidation(key, value);
             }
         }
+
+        var response = await _client.SendAsync(request);
+        var content = await response.Content.ReadAsStringAsync();
+        response.StatusCode.Should().Be(HttpStatusCode.OK, content);
+        return JsonDocument.Parse(content);
+    }
+
+    private async Task<JsonDocument> PostGraphQLExpectAuthErrorAsync(
+        string query,
+        string accessToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/graphql")
+        {
+            Content = JsonContent.Create(new { query })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
         var response = await _client.SendAsync(request);
         var content = await response.Content.ReadAsStringAsync();
