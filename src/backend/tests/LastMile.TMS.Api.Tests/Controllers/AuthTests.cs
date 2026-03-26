@@ -17,7 +17,7 @@ public class AuthTests(CustomWebApplicationFactory factory)
         BaseAddress = new Uri("https://localhost")
     });
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => factory.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
 
     // ── Helpers ────────────────────────────────────────────────────────────────

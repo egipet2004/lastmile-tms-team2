@@ -18,7 +18,7 @@ public class VehiclesControllerTests(CustomWebApplicationFactory factory)
         BaseAddress = new Uri("https://localhost")
     });
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync() => factory.ResetDatabaseAsync();
     public Task DisposeAsync() => Task.CompletedTask;
 
     private async Task<string> GetAccessTokenAsync()
@@ -540,7 +540,7 @@ public class VehiclesControllerTests(CustomWebApplicationFactory factory)
             var route = new Route
             {
                 VehicleId = vehicleId,
-                DriverId = Guid.NewGuid(),
+                DriverId = DbSeeder.TestDriverId,
                 StartDate = DateTimeOffset.UtcNow,
                 StartMileage = 0,
                 Status = RouteStatus.Planned

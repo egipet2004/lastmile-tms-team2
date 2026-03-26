@@ -24,11 +24,7 @@ public class UserManagementGraphQLTests(CustomWebApplicationFactory factory)
         BaseAddress = new Uri("https://localhost")
     });
 
-    public Task InitializeAsync()
-    {
-        factory.EmailService.Clear();
-        return Task.CompletedTask;
-    }
+    public Task InitializeAsync() => factory.ResetDatabaseAsync();
 
     public Task DisposeAsync() => Task.CompletedTask;
 

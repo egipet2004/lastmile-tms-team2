@@ -11,12 +11,15 @@ using Microsoft.Extensions.DependencyInjection;
 namespace LastMile.TMS.Api.Tests.GraphQL;
 
 public class DepotGraphQLTests(CustomWebApplicationFactory factory)
-    : IClassFixture<CustomWebApplicationFactory>
+    : IClassFixture<CustomWebApplicationFactory>, IAsyncLifetime
 {
     private readonly HttpClient _client = factory.CreateClient(new WebApplicationFactoryClientOptions
     {
         BaseAddress = new Uri("https://localhost")
     });
+
+    public Task InitializeAsync() => factory.ResetDatabaseAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task Depots_WithAdminToken_ReturnsFullDepotFields()

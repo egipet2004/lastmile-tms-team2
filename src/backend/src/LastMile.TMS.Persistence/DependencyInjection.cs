@@ -56,7 +56,8 @@ public static class DependencyInjection
 
         services.AddScoped<IAppDbContext>(provider => provider.GetRequiredService<AppDbContext>());
 
-        services.AddHostedService<DbSeeder>();
+        services.AddSingleton<DbSeeder>();
+        services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<DbSeeder>());
 
         return services;
     }
