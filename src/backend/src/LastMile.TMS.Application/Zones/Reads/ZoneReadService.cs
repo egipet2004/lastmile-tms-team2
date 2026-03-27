@@ -23,24 +23,28 @@ public sealed class ZoneReadService(IAppDbContext dbContext) : IZoneReadService
         return zone is null ? null : MapToDto(zone);
     }
 
-    private static ZoneDto MapToDto(Domain.Entities.Zone z) => new(
-        z.Id,
-        z.Name,
-        z.Boundary.AsText(),
-        z.IsActive,
-        z.DepotId,
-        z.Depot?.Name,
-        z.CreatedAt,
-        z.LastModifiedAt);
+    private static ZoneDto MapToDto(Domain.Entities.Zone z) => new()
+    {
+        Id = z.Id,
+        Name = z.Name,
+        Boundary = z.Boundary.AsText(),
+        IsActive = z.IsActive,
+        DepotId = z.DepotId,
+        DepotName = z.Depot?.Name,
+        CreatedAt = z.CreatedAt,
+        UpdatedAt = z.LastModifiedAt
+    };
 
     private static Expression<Func<Domain.Entities.Zone, ZoneDto>> MapToDtoExpression() =>
-        z => new ZoneDto(
-            z.Id,
-            z.Name,
-            z.Boundary.AsText(),
-            z.IsActive,
-            z.DepotId,
-            z.Depot != null ? z.Depot.Name : null,
-            z.CreatedAt,
-            z.LastModifiedAt);
+        z => new ZoneDto
+        {
+            Id = z.Id,
+            Name = z.Name,
+            Boundary = z.Boundary.AsText(),
+            IsActive = z.IsActive,
+            DepotId = z.DepotId,
+            DepotName = z.Depot != null ? z.Depot.Name : null,
+            CreatedAt = z.CreatedAt,
+            UpdatedAt = z.LastModifiedAt
+        };
 }

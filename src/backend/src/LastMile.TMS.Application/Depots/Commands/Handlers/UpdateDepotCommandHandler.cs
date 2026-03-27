@@ -60,26 +60,35 @@ public class UpdateDepotCommandHandler(
         return MapToDto(depot);
     }
 
-    private static DepotDto MapToDto(Depot depot) => new(
-        depot.Id,
-        depot.Name,
-        depot.Address is not null
-            ? new AddressDto(
-                depot.Address.Street1,
-                depot.Address.Street2,
-                depot.Address.City,
-                depot.Address.State,
-                depot.Address.PostalCode,
-                depot.Address.CountryCode,
-                depot.Address.IsResidential,
-                depot.Address.ContactName,
-                depot.Address.CompanyName,
-                depot.Address.Phone,
-                depot.Address.Email)
+    private static DepotDto MapToDto(Depot depot) => new()
+    {
+        Id = depot.Id,
+        Name = depot.Name,
+        Address = depot.Address is not null
+            ? new AddressDto
+            {
+                Street1 = depot.Address.Street1,
+                Street2 = depot.Address.Street2,
+                City = depot.Address.City,
+                State = depot.Address.State,
+                PostalCode = depot.Address.PostalCode,
+                CountryCode = depot.Address.CountryCode,
+                IsResidential = depot.Address.IsResidential,
+                ContactName = depot.Address.ContactName,
+                CompanyName = depot.Address.CompanyName,
+                Phone = depot.Address.Phone,
+                Email = depot.Address.Email
+            }
             : null,
-        depot.OperatingHours.Select(h => new OperatingHoursDto(h.DayOfWeek, h.OpenTime, h.ClosedTime, h.IsClosed)).ToList(),
-        depot.IsActive,
-        depot.CreatedAt,
-        depot.LastModifiedAt
-    );
+        OperatingHours = depot.OperatingHours.Select(h => new OperatingHoursDto
+        {
+            DayOfWeek = h.DayOfWeek,
+            OpenTime = h.OpenTime,
+            ClosedTime = h.ClosedTime,
+            IsClosed = h.IsClosed
+        }).ToList(),
+        IsActive = depot.IsActive,
+        CreatedAt = depot.CreatedAt,
+        UpdatedAt = depot.LastModifiedAt
+    };
 }

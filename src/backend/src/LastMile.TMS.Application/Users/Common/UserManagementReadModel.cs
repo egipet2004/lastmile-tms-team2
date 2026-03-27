@@ -131,20 +131,22 @@ internal static class UserManagementReadModel
     public static UserManagementUserDto ToDto(
         UserManagementUserRecord user,
         string? roleName) =>
-        new(
-            user.Id,
-            user.FirstName,
-            user.LastName,
-            $"{user.FirstName} {user.LastName}".Trim(),
-            user.Email,
-            user.Phone,
-            roleName,
-            user.IsActive,
-            user.IsSystemAdmin,
-            user.DepotId,
-            user.DepotName,
-            user.ZoneId,
-            user.ZoneName,
-            user.CreatedAt,
-            user.LastModifiedAt);
+        new()
+        {
+            Id = user.Id,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            FullName = $"{user.FirstName} {user.LastName}".Trim(),
+            Email = user.Email,
+            Phone = user.Phone,
+            Role = roleName,
+            IsActive = user.IsActive,
+            IsProtected = user.IsSystemAdmin,
+            DepotId = user.DepotId,
+            DepotName = user.DepotName,
+            ZoneId = user.ZoneId,
+            ZoneName = user.ZoneName,
+            CreatedAt = user.CreatedAt,
+            LastModifiedAt = user.LastModifiedAt
+        };
 }

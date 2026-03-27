@@ -41,21 +41,23 @@ public sealed class UserReadService(IAppDbContext dbContext) : IUserReadService
         return query
             .OrderBy(u => u.LastName)
             .ThenBy(u => u.FirstName)
-            .Select(u => new UserManagementUserDto(
-                u.Id,
-                u.FirstName,
-                u.LastName,
-                u.FirstName + " " + u.LastName,
-                u.Email!,
-                u.PhoneNumber,
-                null,
-                u.IsActive,
-                u.IsSystemAdmin,
-                u.DepotId,
-                u.Depot != null ? u.Depot.Name : null,
-                u.ZoneId,
-                u.Zone != null ? u.Zone.Name : null,
-                u.CreatedAt,
-                u.LastModifiedAt));
+            .Select(u => new UserManagementUserDto
+            {
+                Id = u.Id,
+                FirstName = u.FirstName,
+                LastName = u.LastName,
+                FullName = u.FirstName + " " + u.LastName,
+                Email = u.Email!,
+                Phone = u.PhoneNumber,
+                Role = null,
+                IsActive = u.IsActive,
+                IsProtected = u.IsSystemAdmin,
+                DepotId = u.DepotId,
+                DepotName = u.Depot != null ? u.Depot.Name : null,
+                ZoneId = u.ZoneId,
+                ZoneName = u.Zone != null ? u.Zone.Name : null,
+                CreatedAt = u.CreatedAt,
+                LastModifiedAt = u.LastModifiedAt
+            });
     }
 }

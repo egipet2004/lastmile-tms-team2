@@ -12,6 +12,7 @@ namespace LastMile.TMS.Api.GraphQL.Depots;
 public sealed class DepotQuery
 {
     [Authorize(Roles = new[] { "OperationsManager", "Admin", "Dispatcher" })]
+    [UseProjection]
     [UseSorting]
     [UseFiltering]
     public IQueryable<DepotDto> GetDepots(

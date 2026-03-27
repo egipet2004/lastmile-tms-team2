@@ -1,5 +1,6 @@
 using HotChocolate;
 using HotChocolate.Authorization;
+using HotChocolate.Data;
 using LastMile.TMS.Application.Users.Common;
 using LastMile.TMS.Application.Users.Queries;
 using LastMile.TMS.Application.Users.Reads;
@@ -12,6 +13,9 @@ namespace LastMile.TMS.Api.GraphQL.Users;
 [Authorize(Roles = new[] { nameof(PredefinedRole.Admin) })]
 public sealed class UserManagementQuery
 {
+    [UseProjection]
+    [UseSorting]
+    [UseFiltering]
     public IQueryable<UserManagementUserDto> Users(
         string? search = null,
         bool? isActive = null,

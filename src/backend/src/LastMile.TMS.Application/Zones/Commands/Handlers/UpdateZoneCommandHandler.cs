@@ -36,15 +36,17 @@ public class UpdateZoneCommandHandler(
 
         await db.SaveChangesAsync(cancellationToken);
 
-        return new ZoneDto(
-            zone.Id,
-            zone.Name,
-            zone.Boundary.AsText(),
-            zone.IsActive,
-            zone.DepotId,
-            zone.Depot?.Name,
-            zone.CreatedAt,
-            zone.LastModifiedAt);
+        return new ZoneDto
+        {
+            Id = zone.Id,
+            Name = zone.Name,
+            Boundary = zone.Boundary.AsText(),
+            IsActive = zone.IsActive,
+            DepotId = zone.DepotId,
+            DepotName = zone.Depot?.Name,
+            CreatedAt = zone.CreatedAt,
+            UpdatedAt = zone.LastModifiedAt
+        };
     }
 
     private static bool HasBoundaryInput(UpdateZoneCommand request)

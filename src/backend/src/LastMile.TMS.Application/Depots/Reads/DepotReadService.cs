@@ -18,26 +18,35 @@ public sealed class DepotReadService(IAppDbContext dbContext) : IDepotReadServic
             .Select(MapToDto());
 
     private static System.Linq.Expressions.Expression<Func<Domain.Entities.Depot, DepotDto>> MapToDto() =>
-        d => new DepotDto(
-            d.Id,
-            d.Name,
-            d.Address != null
-                ? new AddressDto(
-                    d.Address.Street1,
-                    d.Address.Street2,
-                    d.Address.City,
-                    d.Address.State,
-                    d.Address.PostalCode,
-                    d.Address.CountryCode,
-                    d.Address.IsResidential,
-                    d.Address.ContactName,
-                    d.Address.CompanyName,
-                    d.Address.Phone,
-                    d.Address.Email)
+        d => new DepotDto
+        {
+            Id = d.Id,
+            Name = d.Name,
+            Address = d.Address != null
+                ? new AddressDto
+                {
+                    Street1 = d.Address.Street1,
+                    Street2 = d.Address.Street2,
+                    City = d.Address.City,
+                    State = d.Address.State,
+                    PostalCode = d.Address.PostalCode,
+                    CountryCode = d.Address.CountryCode,
+                    IsResidential = d.Address.IsResidential,
+                    ContactName = d.Address.ContactName,
+                    CompanyName = d.Address.CompanyName,
+                    Phone = d.Address.Phone,
+                    Email = d.Address.Email
+                }
                 : null,
-            d.OperatingHours.Select(h => new OperatingHoursDto(
-                h.DayOfWeek, h.OpenTime, h.ClosedTime, h.IsClosed)).ToList(),
-            d.IsActive,
-            d.CreatedAt,
-            d.LastModifiedAt);
+            OperatingHours = d.OperatingHours.Select(h => new OperatingHoursDto
+            {
+                DayOfWeek = h.DayOfWeek,
+                OpenTime = h.OpenTime,
+                ClosedTime = h.ClosedTime,
+                IsClosed = h.IsClosed
+            }).ToList(),
+            IsActive = d.IsActive,
+            CreatedAt = d.CreatedAt,
+            UpdatedAt = d.LastModifiedAt
+        };
 }

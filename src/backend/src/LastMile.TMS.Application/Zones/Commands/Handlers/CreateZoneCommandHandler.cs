@@ -34,15 +34,17 @@ public class CreateZoneCommandHandler(
             .AsNoTracking()
             .FirstOrDefaultAsync(d => d.Id == zone.DepotId, cancellationToken);
 
-        return new ZoneDto(
-            zone.Id,
-            zone.Name,
-            zone.Boundary.AsText(),
-            zone.IsActive,
-            zone.DepotId,
-            depot?.Name,
-            zone.CreatedAt,
-            zone.LastModifiedAt);
+        return new ZoneDto
+        {
+            Id = zone.Id,
+            Name = zone.Name,
+            Boundary = zone.Boundary.AsText(),
+            IsActive = zone.IsActive,
+            DepotId = zone.DepotId,
+            DepotName = depot?.Name,
+            CreatedAt = zone.CreatedAt,
+            UpdatedAt = zone.LastModifiedAt
+        };
     }
 
     private NetTopologySuite.Geometries.Polygon? ParseBoundary(CreateZoneCommand request)

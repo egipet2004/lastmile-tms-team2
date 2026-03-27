@@ -103,7 +103,7 @@ type Query @authorize(roles: [ "Admin" ]) {
   drivers(depotId: UUID): [DriverReadModel!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
   parcelsForRouteCreation: [ParcelOptionDto!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
   routes(order: [RouteDtoSortInput!] @cost(weight: "10") where: RouteDtoFilterInput @cost(weight: "10")): [RouteDto!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
-  users(search: String isActive: Boolean depotId: UUID zoneId: UUID): [UserManagementUserDto!]! @cost(weight: "10")
+  users(search: String isActive: Boolean depotId: UUID zoneId: UUID order: [UserManagementUserDtoSortInput!] @cost(weight: "10") where: UserManagementUserDtoFilterInput @cost(weight: "10")): [UserManagementUserDto!]! @cost(weight: "10")
   user(id: UUID!): [UserManagementUserDto!]! @cost(weight: "10")
   userManagementLookups: UserManagementLookupsDto! @cost(weight: "10")
   vehicles(order: [VehicleDtoSortInput!] @cost(weight: "10") where: VehicleDtoFilterInput @cost(weight: "10")): [VehicleDto!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
@@ -529,6 +529,44 @@ input UpdateZoneInput {
   geoJson: String
   coordinates: [[Float!]!]
   boundaryWkt: String
+}
+
+input UserManagementUserDtoFilterInput {
+  and: [UserManagementUserDtoFilterInput!]
+  or: [UserManagementUserDtoFilterInput!]
+  id: UuidOperationFilterInput
+  firstName: StringOperationFilterInput
+  lastName: StringOperationFilterInput
+  fullName: StringOperationFilterInput
+  email: StringOperationFilterInput
+  phone: StringOperationFilterInput
+  role: StringOperationFilterInput
+  isActive: BooleanOperationFilterInput
+  isProtected: BooleanOperationFilterInput
+  depotId: UuidOperationFilterInput
+  depotName: StringOperationFilterInput
+  zoneId: UuidOperationFilterInput
+  zoneName: StringOperationFilterInput
+  createdAt: DateTimeOperationFilterInput
+  lastModifiedAt: DateTimeOperationFilterInput
+}
+
+input UserManagementUserDtoSortInput {
+  id: SortEnumType @cost(weight: "10")
+  firstName: SortEnumType @cost(weight: "10")
+  lastName: SortEnumType @cost(weight: "10")
+  fullName: SortEnumType @cost(weight: "10")
+  email: SortEnumType @cost(weight: "10")
+  phone: SortEnumType @cost(weight: "10")
+  role: SortEnumType @cost(weight: "10")
+  isActive: SortEnumType @cost(weight: "10")
+  isProtected: SortEnumType @cost(weight: "10")
+  depotId: SortEnumType @cost(weight: "10")
+  depotName: SortEnumType @cost(weight: "10")
+  zoneId: SortEnumType @cost(weight: "10")
+  zoneName: SortEnumType @cost(weight: "10")
+  createdAt: SortEnumType @cost(weight: "10")
+  lastModifiedAt: SortEnumType @cost(weight: "10")
 }
 
 input UuidOperationFilterInput {

@@ -15,27 +15,31 @@ public sealed class DepotMutation
         [Service] ISender mediator = null!,
         CancellationToken cancellationToken = default)
     {
-        var address = new AddressDto(
-            input.Address.Street1,
-            input.Address.Street2,
-            input.Address.City,
-            input.Address.State,
-            input.Address.PostalCode,
-            input.Address.CountryCode,
-            input.Address.IsResidential,
-            input.Address.ContactName,
-            input.Address.CompanyName,
-            input.Address.Phone,
-            input.Address.Email);
+        var address = new AddressDto
+        {
+            Street1 = input.Address.Street1,
+            Street2 = input.Address.Street2,
+            City = input.Address.City,
+            State = input.Address.State,
+            PostalCode = input.Address.PostalCode,
+            CountryCode = input.Address.CountryCode,
+            IsResidential = input.Address.IsResidential,
+            ContactName = input.Address.ContactName,
+            CompanyName = input.Address.CompanyName,
+            Phone = input.Address.Phone,
+            Email = input.Address.Email
+        };
 
         List<OperatingHoursDto>? operatingHours = null;
         if (input.OperatingHours is not null)
         {
-            operatingHours = input.OperatingHours.Select(h => new OperatingHoursDto(
-                h.DayOfWeek,
-                ParseTime(h.OpenTime),
-                ParseTime(h.ClosedTime),
-                h.IsClosed)).ToList();
+            operatingHours = input.OperatingHours.Select(h => new OperatingHoursDto
+            {
+                DayOfWeek = h.DayOfWeek,
+                OpenTime = ParseTime(h.OpenTime),
+                ClosedTime = ParseTime(h.ClosedTime),
+                IsClosed = h.IsClosed
+            }).ToList();
         }
 
         return await mediator.Send(
@@ -53,28 +57,32 @@ public sealed class DepotMutation
         AddressDto? address = null;
         if (input.Address is not null)
         {
-            address = new AddressDto(
-                input.Address.Street1,
-                input.Address.Street2,
-                input.Address.City,
-                input.Address.State,
-                input.Address.PostalCode,
-                input.Address.CountryCode,
-                input.Address.IsResidential,
-                input.Address.ContactName,
-                input.Address.CompanyName,
-                input.Address.Phone,
-                input.Address.Email);
+            address = new AddressDto
+            {
+                Street1 = input.Address.Street1,
+                Street2 = input.Address.Street2,
+                City = input.Address.City,
+                State = input.Address.State,
+                PostalCode = input.Address.PostalCode,
+                CountryCode = input.Address.CountryCode,
+                IsResidential = input.Address.IsResidential,
+                ContactName = input.Address.ContactName,
+                CompanyName = input.Address.CompanyName,
+                Phone = input.Address.Phone,
+                Email = input.Address.Email
+            };
         }
 
         List<OperatingHoursDto>? operatingHours = null;
         if (input.OperatingHours is not null)
         {
-            operatingHours = input.OperatingHours.Select(h => new OperatingHoursDto(
-                h.DayOfWeek,
-                ParseTime(h.OpenTime),
-                ParseTime(h.ClosedTime),
-                h.IsClosed)).ToList();
+            operatingHours = input.OperatingHours.Select(h => new OperatingHoursDto
+            {
+                DayOfWeek = h.DayOfWeek,
+                OpenTime = ParseTime(h.OpenTime),
+                ClosedTime = ParseTime(h.ClosedTime),
+                IsClosed = h.IsClosed
+            }).ToList();
         }
 
         return await mediator.Send(
