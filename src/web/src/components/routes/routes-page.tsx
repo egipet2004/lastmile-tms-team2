@@ -43,15 +43,6 @@ export default function RoutesPage() {
     status: statusFilter,
   });
 
-  if (sessionStatus === "loading" || isLoading) return <ListPageLoading />;
-  if (error)
-    return (
-      <QueryErrorAlert
-        title="Could not load routes"
-        message={getErrorMessage(error)}
-      />
-    );
-
   const total = data.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
@@ -60,6 +51,15 @@ export default function RoutesPage() {
     () => data.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
     [data, page],
   );
+
+  if (sessionStatus === "loading" || isLoading) return <ListPageLoading />;
+  if (error)
+    return (
+      <QueryErrorAlert
+        title="Could not load routes"
+        message={getErrorMessage(error)}
+      />
+    );
 
   return (
     <>
