@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Playwright generated files:
     "playwright-report/**",
+    // GraphQL codegen output:
+    "src/graphql/generated/**",
   ]),
 ]);
 

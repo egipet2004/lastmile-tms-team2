@@ -16,7 +16,7 @@ export type Scalars = {
   /** The `DateTime` scalar represents an ISO-8601 compliant date time type. */
   DateTime: { input: string; output: string; }
   /** The `Decimal` scalar type represents a decimal floating-point number. */
-  Decimal: { input: any; output: any; }
+  Decimal: { input: number; output: number; }
   /** The `TimeSpan` scalar represents an ISO-8601 compliant duration type. */
   TimeSpan: { input: string; output: string; }
   UUID: { input: string; output: string; }
@@ -944,7 +944,7 @@ export type GetDriversQuery = { __typename?: 'Query', drivers: Array<{ __typenam
 export type GetParcelsForRouteCreationQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetParcelsForRouteCreationQuery = { __typename?: 'Query', parcelsForRouteCreation: Array<{ __typename?: 'ParcelOptionDto', id: string, trackingNumber: string, weight: any, weightUnit: WeightUnit }> };
+export type GetParcelsForRouteCreationQuery = { __typename?: 'Query', parcelsForRouteCreation: Array<{ __typename?: 'ParcelOptionDto', id: string, trackingNumber: string, weight: number, weightUnit: WeightUnit }> };
 
 export type GetRoutesQueryVariables = Exact<{
   where?: InputMaybe<RouteDtoFilterInput>;
@@ -1024,14 +1024,14 @@ export type GetVehiclesQueryVariables = Exact<{
 }>;
 
 
-export type GetVehiclesQuery = { __typename?: 'Query', vehicles: Array<{ __typename?: 'VehicleDto', id: string, registrationPlate: string, type: VehicleType, parcelCapacity: number, weightCapacity: any, status: VehicleStatus, depotId: string, depotName: string, totalRoutes: number, routesCompleted: number, totalMileage: number, createdAt: string, lastModifiedAt?: string | null }> };
+export type GetVehiclesQuery = { __typename?: 'Query', vehicles: Array<{ __typename?: 'VehicleDto', id: string, registrationPlate: string, type: VehicleType, parcelCapacity: number, weightCapacity: number, status: VehicleStatus, depotId: string, depotName: string, totalRoutes: number, routesCompleted: number, totalMileage: number, createdAt: string, lastModifiedAt?: string | null }> };
 
 export type CreateVehicleMutationVariables = Exact<{
   input: CreateVehicleDtoInput;
 }>;
 
 
-export type CreateVehicleMutation = { __typename?: 'Mutation', createVehicle: { __typename?: 'VehicleDto', id: string, registrationPlate: string, type: VehicleType, parcelCapacity: number, weightCapacity: any, status: VehicleStatus, depotId: string, depotName: string, totalRoutes: number, routesCompleted: number, totalMileage: number, createdAt: string, lastModifiedAt?: string | null } };
+export type CreateVehicleMutation = { __typename?: 'Mutation', createVehicle: { __typename?: 'VehicleDto', id: string, registrationPlate: string, type: VehicleType, parcelCapacity: number, weightCapacity: number, status: VehicleStatus, depotId: string, depotName: string, totalRoutes: number, routesCompleted: number, totalMileage: number, createdAt: string, lastModifiedAt?: string | null } };
 
 export type UpdateVehicleMutationVariables = Exact<{
   id: Scalars['UUID']['input'];
@@ -1039,7 +1039,7 @@ export type UpdateVehicleMutationVariables = Exact<{
 }>;
 
 
-export type UpdateVehicleMutation = { __typename?: 'Mutation', updateVehicle?: { __typename?: 'VehicleDto', id: string, registrationPlate: string, type: VehicleType, parcelCapacity: number, weightCapacity: any, status: VehicleStatus, depotId: string, depotName: string, totalRoutes: number, routesCompleted: number, totalMileage: number, createdAt: string, lastModifiedAt?: string | null } | null };
+export type UpdateVehicleMutation = { __typename?: 'Mutation', updateVehicle?: { __typename?: 'VehicleDto', id: string, registrationPlate: string, type: VehicleType, parcelCapacity: number, weightCapacity: number, status: VehicleStatus, depotId: string, depotName: string, totalRoutes: number, routesCompleted: number, totalMileage: number, createdAt: string, lastModifiedAt?: string | null } | null };
 
 export type DeleteVehicleMutationVariables = Exact<{
   id: Scalars['UUID']['input'];

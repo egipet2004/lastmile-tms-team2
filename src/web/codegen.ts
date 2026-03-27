@@ -15,6 +15,7 @@ const config: CodegenConfig = {
         scalars: {
           DateTime: "string",
           DateTimeOffset: "string",
+          Decimal: "number",
           Geometry: "string",
           TimeSpan: "string",
           UUID: "string",
