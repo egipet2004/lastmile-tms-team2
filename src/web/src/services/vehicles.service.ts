@@ -3,17 +3,19 @@ import {
   DELETE_VEHICLE,
   PAGINATED_VEHICLES,
   UPDATE_VEHICLE,
-  VEHICLE_BY_ID,
 } from "@/graphql/vehicles";
+import type {
+  GetVehiclesQuery,
+  CreateVehicleMutation,
+  UpdateVehicleMutation,
+} from "@/graphql/vehicles";
+import type { VehicleFilterInput } from "@/graphql/generated";
 import { graphqlRequest } from "@/lib/network/graphql-client";
-import {
+import type {
   Vehicle,
   CreateVehicleRequest,
   UpdateVehicleRequest,
-  VehicleStatus,
-  VehicleType,
 } from "@/types/vehicles";
-import type { PaginatedResponse } from "@/types/api";
 import {
   getMockVehiclesPaginated,
   getMockVehicleById,
@@ -21,109 +23,40 @@ import {
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_DATA === "true";
 
-const gqlStatusToVehicleStatus: Record<string, VehicleStatus> = {
-  AVAILABLE: VehicleStatus.Available,
-  IN_USE: VehicleStatus.InUse,
-  MAINTENANCE: VehicleStatus.Maintenance,
-  RETIRED: VehicleStatus.Retired,
-};
-
-const gqlTypeToVehicleType: Record<string, VehicleType> = {
-  VAN: VehicleType.Van,
-  CAR: VehicleType.Car,
-  BIKE: VehicleType.Bike,
-};
-
-const vehicleStatusToGraphQL = (status: VehicleStatus): string =>
-  (["AVAILABLE", "IN_USE", "MAINTENANCE", "RETIRED"] as const)[status];
-
-const vehicleTypeToGraphQL = (type: VehicleType): string =>
-  (["VAN", "CAR", "BIKE"] as const)[type];
-
-function mapVehicleStatus(v: unknown): VehicleStatus {
-  if (typeof v === "number" && v >= 0 && v <= 3) return v as VehicleStatus;
-  if (typeof v === "string" && v in gqlStatusToVehicleStatus) {
-    return gqlStatusToVehicleStatus[v];
-  }
-  return VehicleStatus.Available;
-}
-
-function mapVehicleType(t: unknown): VehicleType {
-  if (typeof t === "number" && t >= 0 && t <= 2) return t as VehicleType;
-  if (typeof t === "string" && t in gqlTypeToVehicleType) {
-    return gqlTypeToVehicleType[t];
-  }
-  return VehicleType.Van;
-}
-
-/** GraphQL/JSON may use camelCase or PascalCase depending on serializer. */
-function pickNumber(
-  v: Record<string, unknown>,
-  camel: string,
-  pascal: string
-): number | undefined {
-  const raw = v[camel] ?? v[pascal];
-  if (raw === null || raw === undefined || raw === "") return undefined;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : undefined;
-}
-
-function mapVehicle(raw: unknown): Vehicle {
-  const v = raw as Record<string, unknown>;
-  return {
-    id: String(v.id),
-    registrationPlate: String(v.registrationPlate ?? ""),
-    type: mapVehicleType(v.type),
-    parcelCapacity: Number(v.parcelCapacity ?? 0),
-    weightCapacity: Number(v.weightCapacity ?? 0),
-    status: mapVehicleStatus(v.status),
-    depotId: String(v.depotId ?? ""),
-    depotName: String(v.depotName ?? ""),
-    totalRoutes: pickNumber(v, "totalRoutes", "TotalRoutes"),
-    routesCompleted: pickNumber(v, "routesCompleted", "RoutesCompleted"),
-    totalMileage: pickNumber(v, "totalMileage", "TotalMileage"),
-    createdAt:
-      typeof v.createdAt === "string"
-        ? v.createdAt
-        : String(v.createdAt ?? ""),
-    lastModifiedAt:
-      v.lastModifiedAt == null
-        ? null
-        : typeof v.lastModifiedAt === "string"
-          ? v.lastModifiedAt
-          : String(v.lastModifiedAt),
-  };
-}
-
 export const vehiclesService = {
   getAll: async (
-    page = 1,
-    pageSize = 20,
-    status?: VehicleStatus,
-    depotId?: string
-  ): Promise<PaginatedResponse<Vehicle>> => {
+    where?: VehicleFilterInput
+  ): Promise<Vehicle[]> => {
     if (USE_MOCK) {
       return Promise.resolve(
-        getMockVehiclesPaginated(page, pageSize, status)
+        getMockVehiclesPaginated(1, 1000).items,
       );
     }
 
-    const variables: Record<string, unknown> = { page, pageSize };
-    if (status !== undefined) {
-      variables.status = vehicleStatusToGraphQL(status);
-    }
-    if (depotId !== undefined && depotId.trim() !== "") {
-      variables.depotId = depotId;
+    const variables: Record<string, unknown> = {};
+    if (where !== undefined) {
+      variables.where = where;
     }
 
-    const data = await graphqlRequest<{
-      vehicles: PaginatedResponse<unknown>;
-    }>(PAGINATED_VEHICLES, variables);
-    const p = data.vehicles;
-    return {
-      ...p,
-      items: p.items.map(mapVehicle),
-    };
+    const data = await graphqlRequest<GetVehiclesQuery>(
+      PAGINATED_VEHICLES,
+      variables
+    );
+    return data.vehicles.map((v) => ({
+      id: v.id,
+      registrationPlate: v.registrationPlate,
+      type: v.type,
+      parcelCapacity: v.parcelCapacity,
+      weightCapacity: v.weightCapacity,
+      status: v.status,
+      depotId: v.depotId,
+      depotName: v.depotName ?? null,
+      totalRoutes: v.totalRoutes,
+      routesCompleted: v.routesCompleted,
+      totalMileage: v.totalMileage,
+      createdAt: v.createdAt,
+      updatedAt: v.updatedAt ?? null,
+    }));
   },
 
   getById: async (id: string): Promise<Vehicle> => {
@@ -133,12 +66,10 @@ export const vehiclesService = {
       return Promise.resolve(vehicle);
     }
 
-    const data = await graphqlRequest<{ vehicle: unknown | null }>(
-      VEHICLE_BY_ID,
-      { id }
-    );
-    if (!data.vehicle) throw new Error("Vehicle not found");
-    return mapVehicle(data.vehicle);
+    const vehicles = await vehiclesService.getAll();
+    const vehicle = vehicles.find((v) => v.id === id);
+    if (!vehicle) throw new Error("Vehicle not found");
+    return vehicle;
   },
 
   create: async (data: CreateVehicleRequest): Promise<Vehicle> => {
@@ -147,26 +78,44 @@ export const vehiclesService = {
         ...data,
         id: `mock-${Date.now()}`,
         depotName: "Test Depot",
+        totalRoutes: 0,
+        routesCompleted: 0,
+        totalMileage: 0,
         createdAt: new Date().toISOString(),
-        lastModifiedAt: null,
+        updatedAt: null,
       };
       return Promise.resolve(newVehicle);
     }
 
-    const res = await graphqlRequest<{ createVehicle: unknown }>(
+    const res = await graphqlRequest<CreateVehicleMutation>(
       CREATE_VEHICLE,
       {
         input: {
           registrationPlate: data.registrationPlate,
-          type: vehicleTypeToGraphQL(data.type),
+          type: data.type,
           parcelCapacity: data.parcelCapacity,
           weightCapacity: data.weightCapacity,
-          status: vehicleStatusToGraphQL(data.status),
+          status: data.status,
           depotId: data.depotId,
         },
       }
     );
-    return mapVehicle(res.createVehicle);
+    const v = res.createVehicle;
+    return {
+      id: v.id,
+      registrationPlate: v.registrationPlate,
+      type: v.type,
+      parcelCapacity: v.parcelCapacity,
+      weightCapacity: v.weightCapacity,
+      status: v.status,
+      depotId: v.depotId,
+      depotName: v.depotName ?? null,
+      totalRoutes: v.totalRoutes,
+      routesCompleted: v.routesCompleted,
+      totalMileage: v.totalMileage,
+      createdAt: v.createdAt,
+      updatedAt: v.updatedAt ?? null,
+    };
   },
 
   update: async (id: string, data: UpdateVehicleRequest): Promise<Vehicle> => {
@@ -177,27 +126,42 @@ export const vehiclesService = {
         ...existing,
         ...data,
         depotName: existing.depotName,
-        lastModifiedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
       return Promise.resolve(updated);
     }
 
-    const res = await graphqlRequest<{ updateVehicle: unknown | null }>(
+    const res = await graphqlRequest<UpdateVehicleMutation>(
       UPDATE_VEHICLE,
       {
         id,
         input: {
           registrationPlate: data.registrationPlate,
-          type: vehicleTypeToGraphQL(data.type),
+          type: data.type,
           parcelCapacity: data.parcelCapacity,
           weightCapacity: data.weightCapacity,
-          status: vehicleStatusToGraphQL(data.status),
+          status: data.status,
           depotId: data.depotId,
         },
       }
     );
     if (!res.updateVehicle) throw new Error("Vehicle not found");
-    return mapVehicle(res.updateVehicle);
+    const v = res.updateVehicle;
+    return {
+      id: v.id,
+      registrationPlate: v.registrationPlate,
+      type: v.type,
+      parcelCapacity: v.parcelCapacity,
+      weightCapacity: v.weightCapacity,
+      status: v.status,
+      depotId: v.depotId,
+      depotName: v.depotName ?? null,
+      totalRoutes: v.totalRoutes,
+      routesCompleted: v.routesCompleted,
+      totalMileage: v.totalMileage,
+      createdAt: v.createdAt,
+      updatedAt: v.updatedAt ?? null,
+    };
   },
 
   delete: async (id: string): Promise<boolean> => {

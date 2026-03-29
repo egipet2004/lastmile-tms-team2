@@ -76,13 +76,16 @@ public sealed class DbSeeder(
     public Task StartAsync(CancellationToken cancellationToken) =>
         SeedAsync(cancellationToken);
 
-    public async Task SeedAsync(CancellationToken cancellationToken)
+    public Task SeedAsync(CancellationToken cancellationToken) =>
+        SeedAsync(runMigrations: true, cancellationToken);
+
+    public async Task SeedAsync(bool runMigrations, CancellationToken cancellationToken = default)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var connectionString = configuration.GetConnectionString("DefaultConnection");
 
-        if (connectionString != "InMemory")
+        if (runMigrations && connectionString != "InMemory")
         {
             await dbContext.Database.MigrateAsync(cancellationToken);
         }

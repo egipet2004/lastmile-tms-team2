@@ -9,8 +9,9 @@ namespace LastMile.TMS.Api.Tests.Controllers;
 /// <summary>
 /// Integration tests for the OpenIddict /connect/token endpoint and protected endpoints.
 /// </summary>
+[Collection(ApiTestCollection.Name)]
 public class AuthTests(CustomWebApplicationFactory factory)
-    : IClassFixture<CustomWebApplicationFactory>, IAsyncLifetime
+    : IAsyncLifetime
 {
     private readonly HttpClient _client = factory.CreateClient(new WebApplicationFactoryClientOptions
     {
@@ -144,16 +145,24 @@ public class AuthTests(CustomWebApplicationFactory factory)
     // ── Protected Endpoint Tests ────────────────────────────────────────────
 
     [Fact]
-    public async Task ProtectedEndpoint_WithoutToken_Returns401()
+    public async Task ProtectedEndpoint_WithoutToken_ReturnsAuthError()
     {
         // Arrange
-        _client.DefaultRequestHeaders.Authorization = null;
+        var request = new HttpRequestMessage(HttpMethod.Post, "/graphql")
+        {
+            Content = new StringContent(
+                """{"query":"{ depots { id } }"}""",
+                System.Text.Encoding.UTF8,
+                "application/json")
+        };
 
         // Act
-        var response = await _client.GetAsync("/api/users/me");
+        var response = await _client.SendAsync(request);
+        var content = await response.Content.ReadAsStringAsync();
 
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        // Assert — GraphQL returns 200 but the response contains auth errors
+        var json = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(content)!;
+        json.Should().ContainKey("errors");
     }
 
     [Fact]
@@ -161,7 +170,13 @@ public class AuthTests(CustomWebApplicationFactory factory)
     {
         // Arrange — get a valid access token
         var token = await GetAccessTokenAsync();
-        var request = new HttpRequestMessage(HttpMethod.Get, "/api/users/me");
+        var request = new HttpRequestMessage(HttpMethod.Post, "/graphql")
+        {
+            Content = new StringContent(
+                """{"query":"{ depots { id } }"}""",
+                System.Text.Encoding.UTF8,
+                "application/json")
+        };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         // Act
@@ -172,9 +187,7 @@ public class AuthTests(CustomWebApplicationFactory factory)
         response.StatusCode.Should().Be(HttpStatusCode.OK, content);
 
         var json = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(content)!;
-        json.Should().ContainKey("userId");
-        json.Should().ContainKey("userName");
-        json.Should().ContainKey("roles");
+        json.Should().ContainKey("data");
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────

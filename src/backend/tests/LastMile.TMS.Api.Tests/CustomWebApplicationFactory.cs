@@ -13,8 +13,9 @@ namespace LastMile.TMS.Api.Tests;
 
 /// <summary>
 /// WebApplicationFactory backed by a dedicated PostgreSQL test database.
-/// The database is recreated and reseeded between tests to keep integration
-/// tests isolated while still exercising the real relational provider.
+/// The database schema is migrated once, then each reset truncates all user
+/// tables and reseeds baseline data to keep integration tests isolated while
+/// still exercising the real relational provider.
 /// </summary>
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
@@ -25,8 +26,12 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         Environment.GetEnvironmentVariable("TEST_DB_CONNECTION") ?? DefaultTestConnection;
 
     private readonly SemaphoreSlim _resetLock = new(1, 1);
+    private readonly SemaphoreSlim _initializationLock = new(1, 1);
+    private IReadOnlyList<string>? _resetTableNames;
+    private bool _databaseInitialized;
 
     public TestUserAccountEmailService EmailService { get; } = new();
+    public SqlCommandCaptureInterceptor SqlCapture { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -36,6 +41,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting("Testing:DisableExternalInfrastructure", "true");
         builder.UseSetting("Testing:EnableTestSupport", "true");
         builder.UseSetting("Testing:SupportKey", "integration-test-support-key");
+        builder.UseSetting("Serilog:MinimumLevel:Default", "Warning");
+        builder.UseSetting("Serilog:MinimumLevel:Override:Microsoft", "Warning");
+        builder.UseSetting("Serilog:MinimumLevel:Override:Microsoft.EntityFrameworkCore", "Warning");
+        builder.UseSetting("Serilog:MinimumLevel:Override:Microsoft.EntityFrameworkCore.Database.Command", "Warning");
 
         builder.ConfigureTestServices(services =>
         {
@@ -43,7 +52,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             // StackExchangeRedisCache registers a RedisCacheService and Hangfire registers
             // BackgroundJobServerHostedService; both hang on shutdown when Redis/Hangfire
             // backends are unreachable in the test environment.
-            // Re-add DbSeeder because the tests rely on seeded admin data.
+            // Keep DbSeeder as a singleton and invoke it manually from ResetDatabaseAsync
+            // so the database is seeded exactly once per reset instead of on every host start.
             var hostedServices = services.Where(d => d.ServiceType.IsAssignableTo(typeof(IHostedService))).ToList();
             foreach (var svc in hostedServices)
             {
@@ -51,7 +61,26 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             }
 
             services.AddSingleton<DbSeeder>();
-            services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<DbSeeder>());
+
+            services.AddSingleton(SqlCapture);
+
+            services.RemoveAll<AppDbContext>();
+            services.RemoveAll<DbContextOptions<AppDbContext>>();
+            services.RemoveAll<IAppDbContext>();
+            services.AddDbContext<AppDbContext>((serviceProvider, options) =>
+            {
+                options.UseNpgsql(
+                    TestConnection,
+                    npgsql =>
+                    {
+                        npgsql.UseNetTopologySuite();
+                        npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
+                    });
+                options.UseOpenIddict();
+                options.EnableSensitiveDataLogging();
+                options.AddInterceptors(serviceProvider.GetRequiredService<SqlCommandCaptureInterceptor>());
+            });
+            services.AddScoped<IAppDbContext>(provider => provider.GetRequiredService<AppDbContext>());
 
             services.RemoveAll<IUserAccountEmailService>();
             services.RemoveAll<IUserAccountEmailJobScheduler>();
@@ -64,7 +93,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     protected override IHost CreateHost(IHostBuilder builder)
     {
         EnsureDatabaseExistsAsync(TestConnection).GetAwaiter().GetResult();
-        return base.CreateHost(builder);
+        var host = base.CreateHost(builder);
+        EnsureDatabaseInitializedAsync(host.Services).GetAwaiter().GetResult();
+        return host;
     }
 
     public async Task ResetDatabaseAsync(CancellationToken cancellationToken = default)
@@ -73,27 +104,19 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         try
         {
             _ = Services;
+            await EnsureDatabaseInitializedAsync(Services, cancellationToken);
             EmailService.Clear();
+            SqlCapture.Clear();
 
-            NpgsqlConnection.ClearAllPools();
-
-            await using (var scope = Services.CreateAsyncScope())
-            {
-                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                await dbContext.Database.EnsureDeletedAsync(cancellationToken);
-            }
-
-            NpgsqlConnection.ClearAllPools();
-            await EnsureDatabaseExistsAsync(TestConnection, cancellationToken);
+            await TruncateUserTablesAsync(cancellationToken);
 
             await using (var scope = Services.CreateAsyncScope())
             {
-                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                await dbContext.Database.MigrateAsync(cancellationToken);
-
                 var seeder = scope.ServiceProvider.GetRequiredService<DbSeeder>();
-                await seeder.SeedAsync(cancellationToken);
+                await seeder.SeedAsync(runMigrations: false, cancellationToken);
             }
+
+            SqlCapture.Clear();
         }
         finally
         {
@@ -138,5 +161,82 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             $"CREATE DATABASE {quotedDatabaseName}",
             connection);
         await createCommand.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private async Task EnsureDatabaseInitializedAsync(
+        IServiceProvider services,
+        CancellationToken cancellationToken = default)
+    {
+        if (_databaseInitialized)
+        {
+            return;
+        }
+
+        await _initializationLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_databaseInitialized)
+            {
+                return;
+            }
+
+            await using var scope = services.CreateAsyncScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await dbContext.Database.MigrateAsync(cancellationToken);
+
+            _resetTableNames = await LoadResetTableNamesAsync(cancellationToken);
+            _databaseInitialized = true;
+        }
+        finally
+        {
+            _initializationLock.Release();
+        }
+    }
+
+    private async Task<IReadOnlyList<string>> LoadResetTableNamesAsync(
+        CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(TestConnection);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT tablename
+            FROM pg_tables
+            WHERE schemaname = 'public'
+              AND tablename NOT IN ('__EFMigrationsHistory', 'spatial_ref_sys')
+            ORDER BY tablename
+            """,
+            connection);
+
+        var tableNames = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            tableNames.Add(reader.GetString(0));
+        }
+
+        return tableNames;
+    }
+
+    private async Task TruncateUserTablesAsync(CancellationToken cancellationToken)
+    {
+        if (_resetTableNames is null || _resetTableNames.Count == 0)
+        {
+            return;
+        }
+
+        var tables = string.Join(
+            ", ",
+            _resetTableNames.Select(tableName => $"public.\"{tableName.Replace("\"", "\"\"")}\""));
+
+        await using var connection = new NpgsqlConnection(TestConnection);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = new NpgsqlCommand(
+            $"TRUNCATE TABLE {tables} RESTART IDENTITY CASCADE;",
+            connection);
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 }

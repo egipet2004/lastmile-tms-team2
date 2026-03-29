@@ -1,4 +1,7 @@
 import type { DepotOption } from "@/types/depots";
+import type { UserRole as GeneratedUserRole } from "@/graphql/generated";
+
+export type UserRole = GeneratedUserRole;
 
 export const USER_ROLES = [
   "Admin",
@@ -8,8 +11,6 @@ export const USER_ROLES = [
   "Driver",
 ] as const;
 
-export type UserRole = (typeof USER_ROLES)[number];
-
 export interface UserManagementUser {
   id: string;
   firstName: string;
@@ -17,7 +18,7 @@ export interface UserManagementUser {
   fullName: string;
   email: string;
   phone: string | null;
-  role: UserRole | null;
+  role: string | null;
   isActive: boolean;
   isProtected: boolean;
   depotId: string | null;
@@ -25,12 +26,7 @@ export interface UserManagementUser {
   zoneId: string | null;
   zoneName: string | null;
   createdAt: string;
-  lastModifiedAt: string | null;
-}
-
-export interface UserManagementUsersResult {
-  totalCount: number;
-  items: UserManagementUser[];
+  updatedAt: string | null;
 }
 
 export interface UserRoleOption {
@@ -82,10 +78,7 @@ export interface UserActionResult {
 
 export interface GetUsersInput {
   search?: string;
-  role?: UserRole;
   isActive?: boolean;
   depotId?: string;
   zoneId?: string;
-  skip?: number;
-  take?: number;
 }

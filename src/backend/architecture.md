@@ -1,14 +1,18 @@
 # Backend Architecture
 
 ## Purpose
-This document defines the target architecture for `src/backend`. It describes how the backend is structured, which responsibilities belong to each project, which dependency directions are allowed, and how requests move through the system.
-
-This file documents the intended steady state of the backend. New code should follow these rules even if older code still needs cleanup.
+This document describes the maintained architecture for `src/backend`.
+It should match the code we actively keep in shape today, not an aspirational future layout.
 
 ## Scope
-The backend solution is a layered .NET application that exposes both REST and GraphQL APIs over the same application core.
+The backend is a layered .NET solution with:
+- GraphQL as the primary domain API
+- REST reserved for auth and technical endpoints
+- CQRS in `Application`
+- Mapperly as the standard mapping tool
+- HotChocolate projection-backed reads for simple list/detail queries
 
-Primary backend domains:
+Primary feature vocabulary:
 - `depots`
 - `drivers`
 - `parcels`
@@ -18,16 +22,16 @@ Primary backend domains:
 - `zones`
 
 ## Core Principles
-- Keep transport thin. Controllers and GraphQL resolvers should delegate to application commands and queries instead of containing business logic.
-- Keep business workflows in `Application`. Request orchestration, validation, DTO shaping, and use-case logic belong there.
-- Keep domain types clean. `Domain` owns entities, enums, and domain-level base abstractions without depending on outer layers.
-- Depend inward only. Outer layers may reference inner layers. Inner layers must not reference transport or infrastructure concerns.
-- Make infrastructure replaceable. External integrations are behind interfaces declared in `Application` and implemented in `Infrastructure` or `Persistence`.
-- Keep persistence explicit. Entity Framework Core mappings, migrations, and data access wiring live in `Persistence`.
-- Test architecture as code. Dependency boundaries are enforced by dedicated architecture tests.
+- Keep transport thin. GraphQL resolvers and REST controllers delegate; they do not own business rules.
+- Keep business behavior in `Application`.
+- Keep GraphQL explicit. Domain entities may be returned from resolvers, but schema shape must always be controlled through explicit GraphQL types.
+- Use Mapperly for object mapping. Avoid handwritten property-by-property mapping except where domain rules or EF tracking make it necessary.
+- Keep projection-backed reads pure. Read services used with `[UseProjection]` return `IQueryable<TEntity>` and do not pre-project into DTOs.
+- Organize by feature first, then by use case.
+- Prefer one obvious place for each responsibility: commands, queries, reads, mappings, DTOs.
+- Depend inward only.
 
 ## Solution Layout
-The canonical solution layout is:
 
 ```text
 src/backend/
@@ -43,58 +47,71 @@ src/backend/
     LastMile.TMS.Architecture.Tests/
     LastMile.TMS.Domain.Tests/
     LastMile.TMS.Infrastructure.Tests/
-  Dockerfile
-  LastMile.TMS.slnx
 ```
 
 ## Project Responsibilities
 
 ### `LastMile.TMS.Api`
-This is the transport and composition root.
+Transport and composition root.
 
 Responsibilities:
-- application startup and middleware pipeline
-- dependency injection composition
-- REST controllers
+- application startup and DI composition
 - GraphQL schema, types, queries, and mutations
-- HTTP auth and authorization setup defaults
-- CORS, Swagger, Problem Details, and request logging
-- transport-specific error handling
+- REST controllers for auth and technical endpoints
+- transport-level auth, error translation, CORS, Swagger, middleware
 
-Canonical API structure:
+GraphQL feature structure:
 
 ```text
-LastMile.TMS.Api/
-  Configuration/
-  Controllers/
-  Diagnostics/
-  GraphQL/
-  Program.cs
+LastMile.TMS.Api/GraphQL/
+  Common/
+    EntityObjectType.cs
+    Query.cs
+    Mutation.cs
+    GraphQLErrorFilter.cs
+    DomainExceptionErrorFilter.cs
+  Depots/
+    DepotInputs.cs
+    DepotMappings.cs
+    DepotMutations.cs
+    DepotQueries.cs
+    DepotTypes.cs
+  Drivers/
+    DriverQueries.cs
+    DriverTypes.cs
+  Parcels/
+  Routes/
+  Users/
+  Vehicles/
+  Zones/
 ```
 
-What belongs here:
-- `Program.cs`
-- `Configuration/*`
-- `Controllers/*`
-- `Diagnostics/*`
-- `GraphQL/*`
-
-What does not belong here:
-- business rules
-- Entity Framework mappings
-- direct integration logic for email, geocoding, or background execution
-- duplicate REST and GraphQL endpoints for the same feature unless there is a concrete client need for both
+Rules:
+- Feature folders use a consistent file-role pattern:
+  - `*Queries.cs`
+  - `*Mutations.cs`
+  - `*Inputs.cs`
+  - `*Mappings.cs`
+  - `*Types.cs`
+- Omit files that a feature does not need. Example: `Drivers` currently has queries and types only.
+- `*Inputs.cs` contains GraphQL input contracts only.
+- `*Mappings.cs` contains Mapperly input mappers only.
+- `*Types.cs` contains output types plus related filter/sort/nested GraphQL types.
+- Resolvers do not talk to `AppDbContext` directly.
+- Mutation resolvers use `ISender`.
+- Query resolvers use either `ISender` or a read service for a given field, not both.
 
 ### `LastMile.TMS.Application`
-This is the use-case layer and the main home of backend behavior.
+Use-case layer and main home of backend behavior.
 
 Responsibilities:
-- commands, queries, and handlers
-- DTOs returned to transport layers
+- commands, queries, handlers
 - validators
+- DTOs for command payloads and workflow/query responses
+- feature read services
+- application interfaces
+- Mapperly mappings used by handlers
 - MediatR pipeline behaviors
-- application interfaces used by outer layers
-- feature-level orchestration
 
 Canonical feature structure:
 
@@ -102,119 +119,94 @@ Canonical feature structure:
 LastMile.TMS.Application/
   Common/
     Behaviors/
-    Constants/
-    Helpers/
     Interfaces/
   Depots/
     Commands/
+      CreateDepot/
+        CreateDepotCommand.cs
+        CreateDepotCommandValidator.cs
+        CreateDepotCommandHandler.cs
+      UpdateDepot/
+        UpdateDepotCommand.cs
+        UpdateDepotCommandValidator.cs
+        UpdateDepotCommandHandler.cs
+      DeleteDepot/
+        DeleteDepotCommand.cs
+        DeleteDepotCommandHandler.cs
     DTOs/
-    Queries/
-    Validators/
-  Drivers/
-  Parcels/
-    Services/
-  Routes/
+    Mappings/
+    Reads/
   Users/
-    Common/
-  Vehicles/
-  Zones/
+    Commands/
+    Queries/
+    DTOs/
+    Mappings/
+    Reads/
+    Support/
+  Parcels/
+    Commands/
+    DTOs/
+    Mappings/
+    Reads/
     Services/
 ```
 
 Rules:
-- feature folders are organized by business domain
-- handlers coordinate use cases through `IAppDbContext` and application interfaces
-- validators live next to their feature commands and queries
-- external dependencies are represented as interfaces, not concrete implementations
+- One folder inside `Commands/` or `Queries/` equals one use case.
+- Each use case uses separate files for request, validator, and handler.
+- `Validator` exists only when needed.
+- `DTOs/` contains request/result DTOs only, not projection read models.
+- `Mappings/` contains Mapperly mapping classes and closely related mapping helpers.
+- `Reads/` contains `I<Feature>ReadService` plus implementation.
+- `Services/` is for feature-specific ports or helper services declared in `Application`.
+- `Support/` is for feature-local rules and helpers that do not belong in DTOs, reads, or services.
+- Not every feature needs every folder. Keep the structure uniform, but do not add empty folders just for symmetry.
 
 ### `LastMile.TMS.Domain`
-This is the inner model of the system.
+Framework-independent domain model.
 
 Responsibilities:
 - entities
 - enums
-- base entity abstractions
-- domain event interfaces
+- value-like domain concepts
+- base abstractions that must stay infrastructure-agnostic
 
-What belongs here:
-- `Entities/*`
-- `Enums/*`
-- `Common/BaseEntity.cs`
-- `Common/BaseAuditableEntity.cs`
-
-What does not belong here:
+Does not contain:
 - MediatR requests
-- EF Core configurations
-- API contracts
-- infrastructure service implementations
+- EF Core configuration
+- GraphQL types
+- Mapperly mappers
 
 ### `LastMile.TMS.Infrastructure`
-This is the implementation layer for non-database external concerns.
+Adapters for external or runtime concerns.
 
 Responsibilities:
 - current user resolution
-- geocoding
-- zone boundary parsing
-- zone matching support
-- email sending
-- background job scheduling
-- options binding for infrastructure concerns
-- OpenIddict server and validation wiring
-
-Canonical structure:
-
-```text
-LastMile.TMS.Infrastructure/
-  Configuration/
-  Options/
-  Services/
-  DependencyInjection.cs
-```
-
-Rules:
-- implement interfaces declared in `Application`
-- keep transport concerns out
-- do not depend on `Api` or `Persistence`
+- email and background jobs
+- geocoding and zone support
+- auth server/validation wiring
+- options binding for external services
 
 ### `LastMile.TMS.Persistence`
-This is the database layer.
+Database layer.
 
 Responsibilities:
 - `AppDbContext`
-- EF Core configuration classes
+- EF Core entity configuration
 - migrations
-- identity persistence wiring
-- OpenIddict EF Core storage wiring
-- database seeding
-
-Canonical structure:
-
-```text
-LastMile.TMS.Persistence/
-  Configurations/
-  Migrations/
-  AppDbContext.cs
-  DbSeeder.cs
-  DependencyInjection.cs
-```
-
-Rules:
-- own database configuration and schema evolution
-- expose persistence to the application layer through `IAppDbContext`
-- do not contain transport code or infrastructure service implementations
+- identity and OpenIddict persistence wiring
+- seeding
 
 ### `tests/*`
-Tests are split by layer so that failure ownership stays obvious.
+Layered test ownership.
 
-Responsibilities:
-- `LastMile.TMS.Api.Tests`: transport and integration coverage for REST and GraphQL
-- `LastMile.TMS.Application.Tests`: handler, validator, and application-rule coverage
-- `LastMile.TMS.Architecture.Tests`: dependency-boundary enforcement
-- `LastMile.TMS.Domain.Tests`: pure domain behavior coverage
-- `LastMile.TMS.Infrastructure.Tests`: infrastructure service behavior coverage
+- `LastMile.TMS.Api.Tests`: GraphQL and REST contract tests
+- `LastMile.TMS.Application.Tests`: handlers, validators, read services
+- `LastMile.TMS.Architecture.Tests`: dependency and convention rules
+- `LastMile.TMS.Domain.Tests`: pure domain behavior
+- `LastMile.TMS.Infrastructure.Tests`: adapter behavior
 
 ## Dependency Rules
-Dependency direction is not just a convention. It is enforced by `LastMile.TMS.Architecture.Tests`.
 
 Allowed dependency graph:
 
@@ -233,265 +225,225 @@ Application -> Domain
 Domain -> (no project dependencies)
 ```
 
-Disallowed examples:
-- `Domain -> Application`
-- `Application -> Infrastructure`
-- `Application -> Persistence`
-- `Infrastructure -> Persistence`
-- `Persistence -> Api`
+Practical rules:
+- `Application` depends on abstractions such as `IAppDbContext`, not transport or persistence details.
+- `Api` depends on `Application` contracts and read services, not feature-internal persistence code.
+- `Infrastructure` and `Persistence` implement inward-facing abstractions.
 
-Practical rule:
-- if a feature needs data access, `Application` depends on an abstraction such as `IAppDbContext`
-- if a feature needs an external capability, `Application` defines the interface and `Infrastructure` implements it
-- if a feature needs transport-specific serialization, that belongs in `Api`
+## Request and Read Flow
 
-## Request Flow
-
-### REST Flow
-The REST path should follow this sequence:
+### GraphQL Mutation Flow
 
 ```text
-HTTP request
--> Controller
--> MediatR command/query
--> FluentValidation pipeline
--> Application handler
--> IAppDbContext and/or application service interfaces
--> Persistence / Infrastructure implementation
--> DTO or status result
--> HTTP response
-```
-
-REST controller rules:
-- keep controllers thin
-- authorize at the endpoint boundary
-- translate transport inputs into commands and queries
-- return transport-friendly results
-- use Problem Details for validation and unhandled server errors
-
-### GraphQL Flow
-The GraphQL path should follow the same core use-case pipeline:
-
-```text
-GraphQL request
--> Query or mutation resolver
--> MediatR command/query
--> FluentValidation pipeline
--> Application handler
--> IAppDbContext and/or application service interfaces
--> Persistence / Infrastructure implementation
--> DTO
+GraphQL mutation
+-> resolver in Api
+-> Input -> Dto via Api Mapperly mapper
+-> ISender / MediatR
+-> validation pipeline
+-> command handler
+-> Dto -> Entity via Application Mapperly mapper
+-> domain rules / persistence
+-> entity or workflow DTO result
 -> GraphQL response
 ```
 
-GraphQL rules:
-- resolvers are thin and feature-scoped by domain
-- schema-specific input and object types stay in `Api/GraphQL/*`
-- GraphQL-specific error filters stay in `Api/GraphQL/Common`
-- business logic still belongs in `Application`
+Notes:
+- Resource mutations usually return domain entities so the same GraphQL object type is reused for queries and mutations.
+- Workflow mutations may return DTOs when there is no shared resource graph. Examples: parcel registration result, password reset result.
 
-## Feature Organization
-The default organization pattern is domain first, then use-case type.
-
-Example:
+### Projection-Backed Query Flow
 
 ```text
-Application/Vehicles/
-  Commands/
-  DTOs/
-  Queries/
-  Validators/
+GraphQL query
+-> resolver in Api
+-> IReadService.GetXxx() returning IQueryable<TEntity>
+-> HotChocolate projection/filtering/sorting middleware
+-> EF Core SQL translation
+-> GraphQL response via explicit EntityObjectType<TEntity>
 ```
 
-Use the same naming vocabulary across layers:
-- `Depots`
-- `Drivers`
-- `Parcels`
-- `Routes`
-- `Users`
-- `Vehicles`
-- `Zones`
-
-Do not invent parallel naming systems for the same concept in different projects.
-
-## Validation and Error Handling
-
-### Validation
-Validation is centralized in the application pipeline.
+Use this for:
+- simple list pages
+- simple detail pages
+- lookup/reference data
+- fields where selection-set driven SQL shaping matters
 
 Rules:
-- use FluentValidation for request validation
-- register validators from the application assembly
-- run validation before handlers execute
-- keep transport layers free from duplicated business validation
+- Read services return `IQueryable<TEntity>`.
+- No DTO projection in read services.
+- No `.Select(new Dto(...))` in read services.
+- No `.Include()` in read services that are meant to work with `[UseProjection]`.
 
-The current MediatR pipeline behavior is `ValidationBehavior<TRequest, TResponse>`.
+### MediatR-Backed Query Flow
 
-### REST Error Handling
-REST uses RFC 7807 Problem Details.
+```text
+GraphQL query
+-> resolver in Api
+-> ISender / MediatR
+-> query handler
+-> application orchestration and materialization
+-> DTO or entity result
+-> GraphQL response
+```
 
-Current behavior:
-- `FluentValidation.ValidationException` becomes `400` with `ValidationProblemDetails`
-- unhandled exceptions become `500` with `ProblemDetails`
-- detailed exception messages are shown only in development environments
+Use this for:
+- workflow-specific reads
+- aggregate screens
+- bundled lookup payloads
+- reads with non-trivial authorization or orchestration
 
-### GraphQL Error Handling
-GraphQL has a dedicated error pipeline and should not rely on the REST exception handler.
+## Command and Query Conventions
 
-Rules:
-- GraphQL error filters stay in `Api/GraphQL/Common`
-- resolver code should still delegate business decisions to the application layer
+Standard command shapes:
+- `CreateXCommand(CreateXDto Dto)`
+- `UpdateXCommand(Guid Id, UpdateXDto Dto)`
 
-## Authentication and Authorization
-Authentication and authorization are part of the runtime contract, not scattered feature code.
+Scalar-only commands are allowed for truly small actions such as:
+- delete
+- deactivate
+- send password reset email
 
-Current model:
-- OpenIddict is used for token issuing and validation
-- password and refresh-token flows are enabled
-- the token endpoint is `/connect/token`
-- JWT validation is configured as the default authenticate and challenge scheme
-- access and refresh token lifetimes are read from configuration
+Queries:
+- keep query request/handler pairs under `Queries/<UseCase>/`
+- use handlers only when the read is more than simple projection-backed retrieval
 
-Authorization rules:
-- enforce role checks at REST controller and GraphQL resolver boundaries
-- application handlers may assume authenticated context is available through `ICurrentUserService` when needed
-- transport layers should not embed business authorization logic that belongs in a use case
+## Mapperly Conventions
 
-## Persistence and Data Model
-`Persistence` owns the EF Core model and schema configuration.
+Mapperly is the standard mapper in this solution.
 
-Current persistence model:
-- `AppDbContext` derives from `IdentityDbContext<ApplicationUser, ApplicationRole, Guid>`
-- Postgres is the primary runtime database
-- NetTopologySuite and PostGIS are enabled for spatial data
-- test scenarios may swap the main database for `UseInMemoryDatabase`
-- EF Core configurations are discovered from the persistence assembly
-- migrations live in `Persistence/Migrations`
-- `DbSeeder` runs as a hosted service
+### Where mappers live
 
-`AppDbContext` currently exposes sets for:
-- `Addresses`
-- `Depots`
-- `DepotOperatingHours`
-- `Zones`
-- `Permissions`
-- `Vehicles`
-- `Drivers`
-- `DriverAvailabilities`
-- `Routes`
-- `Parcels`
+| Layer | Folder | Purpose |
+|---|---|---|
+| Api | `GraphQL/<Feature>/*Mappings.cs` | GraphQL `Input -> Application DTO` |
+| Application | `<Feature>/Mappings/` | `DTO -> Entity`, `Entity -> DTO`, update mappings |
 
-Persistence rules:
-- entity configuration classes belong in `Persistence/Configurations`
-- schema changes require a migration
-- `Application` must not reach directly into EF configuration details
+### Api mapper pattern
+- `Input -> DTO` only
+- no business logic
+- no persistence access
 
-## External Services and Background Work
-External integrations belong behind application-facing interfaces.
+### Application mapper pattern
+- `DTO -> Entity` for create flows
+- `DTO -> existing Entity` update methods for update flows
+- `Entity -> DTO` for workflow/query responses when DTOs are still needed
 
-Current responsibilities implemented in `Infrastructure` include:
-- current user resolution from the HTTP context
-- geocoding for parcel registration
-- zone boundary parsing
-- zone matching
-- user account email sending
-- background scheduling for account email jobs
+### Manual mapping is still allowed only when justified
+Permitted cases:
+- domain-derived values
+- normalization such as uppercasing country code
+- generated identifiers/tracking numbers
+- role assignment and status transitions
+- overlap/capacity checks
+- nested collection replacement logic
+- EF tracked entity update constraints
 
-Background processing rules:
-- Hangfire is the production job runner
-- when test settings disable external infrastructure, in-memory substitutes are used where appropriate
-- job orchestration belongs in infrastructure, not in controllers or GraphQL resolvers
+Do not write manual property-by-property mapping just because a Mapperly mapping was not added yet.
 
-## Configuration and Runtime
-The backend is configuration-driven.
+## GraphQL Conventions
 
-Important configuration areas:
-- `ConnectionStrings`
-- `Authentication`
-- `Frontend`
-- `Email`
-- `Testing`
-- `Serilog`
+### Domain output types
+- Domain entities exposed through GraphQL must use `EntityObjectType<TEntity>`.
+- Output fields are always explicit.
+- Never rely on implicit schema exposure for domain entities.
 
-Runtime notes:
-- `Program.cs` is the only application entry point
-- Serilog is the logging pipeline
-- CORS uses the `AllowFrontend` policy
-- Swagger is enabled in development
-- GraphQL is mapped on both `/api/graphql` and `/graphql`
-- REST controllers and GraphQL share the same application core
-- the Docker image builds and runs `LastMile.TMS.Api`
+### Feature file roles
+- `*Queries.cs`: root query extensions only
+- `*Mutations.cs`: root mutation extensions only
+- `*Inputs.cs`: input contracts only
+- `*Mappings.cs`: Mapperly `Input -> DTO`
+- `*Types.cs`: object types, filter types, sort types, nested supporting GraphQL types
+
+### Filters and sorting
+- Keep filter and sort types close to the resource type, usually in the same `*Types.cs`.
+- Use explicit names in the GraphQL schema rather than leaking CLR type names.
+
+### Read service boundary
+- Projection-backed resolvers should return `IQueryable<TEntity>` from `Application`.
+- Do not insert DTOs between read service and GraphQL projection middleware.
+
+### DataLoader usage
+Use batch loaders only for computed fields that cannot be satisfied by projection cleanly and would otherwise cause N+1 behavior.
+
+## Current Read Strategy by Feature
+
+Projection-backed today:
+- `depots`
+- `drivers`
+- `parcels` list/options reads
+- `routes`
+- `users` list/detail reads
+- `vehicles`
+- `zones`
+
+MediatR-backed today:
+- all mutations
+- workflow queries such as user management lookups
+- any future aggregate or orchestration-heavy read
+
+The real rule is complexity, not domain label.
 
 ## What Belongs Where
 
-### Put code in `Api` when
-- it is about HTTP, GraphQL, middleware, auth defaults, or response formatting
-- it defines controllers, GraphQL types, resolvers, or transport-specific error filters
+Put code in `Api` when:
+- it defines GraphQL schema types, inputs, resolvers, transport auth, or transport error handling
 
-### Put code in `Application` when
-- it defines a use case
-- it validates an incoming command or query
-- it shapes data into DTOs
-- it coordinates domain entities, persistence abstractions, and external service interfaces
+Put code in `Application` when:
+- it defines a use case, validator, read service, mapping, DTO, rule, or orchestration logic
 
-### Put code in `Domain` when
-- it is a pure entity, enum, or domain abstraction
-- it should remain independent of framework and transport concerns
+Put code in `Domain` when:
+- it is pure business model with no transport or infrastructure concerns
 
-### Put code in `Infrastructure` when
-- it talks to external services
-- it reads current request identity
-- it schedules or performs side effects outside the database
+Put code in `Infrastructure` when:
+- it talks to the outside world or runtime environment
 
-### Put code in `Persistence` when
-- it maps entities to tables
-- it configures EF Core
-- it changes the database schema
-- it seeds persistent data
-
-## Conventions
-- Prefer one feature folder per business domain in `Application`.
-- Prefer one command or query per file.
-- Keep handlers small and explicit.
-- Keep DTOs in the application layer, not the API layer.
-- Keep GraphQL inputs and types in `Api/GraphQL/<Domain>`.
-- Keep controllers and resolvers thin.
-- Prefer one canonical transport per feature. Do not maintain REST and GraphQL versions of the same use case without an active consumer.
-- Prefer constructor injection through DI registration modules.
-- Prefer configuration-bound options classes for infrastructure concerns.
-- Add or update architecture tests when dependency rules change intentionally.
+Put code in `Persistence` when:
+- it configures EF Core or owns database behavior
 
 ## Disallowed Patterns
-- business logic inside controllers
-- business logic inside GraphQL resolvers
-- direct `Infrastructure` references from `Application`
-- direct `Persistence` references from `Application` other than approved abstractions
-- EF Core configuration in `Api` or `Application`
-- transport DTOs leaking into `Domain`
-- external service SDK usage directly inside controllers or handlers when an interface should own it
+- business logic inside controllers or GraphQL resolvers
+- direct `AppDbContext` usage from `Api`
+- projection read services returning DTOs or read models
+- `Select(...)` DTO projection inside read services
+- `.Include()` in projection-backed read services
+- separate `Validators/` or `Handlers/` folders at feature root
+- vague feature-local folders such as `Common/` when `Support/`, `DTOs/`, or `Services/` is more precise
+- handwritten mapping instead of Mapperly without a concrete reason
+- parallel REST and GraphQL domain endpoints without an active need
 
-## Testing Strategy
-Every layer should be covered at the level where it makes decisions.
+## Adding a New Feature or Resource
 
-Recommended split:
-- use architecture tests to protect dependency boundaries
-- use application tests for validation, handlers, and use-case rules
-- use API tests for REST and GraphQL contract behavior
-- use infrastructure tests for integration adapters and service implementations
-- use domain tests for entity and rule behavior that does not need outer layers
+1. Add or update the domain entity in `Domain` if required.
+2. Add persistence wiring and migrations in `Persistence`.
+3. In `Application`, create a feature folder with:
+   - `Commands/<UseCase>/`
+   - `Queries/<UseCase>/` if needed
+   - `DTOs/`
+   - `Mappings/`
+   - `Reads/`
+   - optional `Services/` or `Support/`
+4. Use Mapperly for `DTO <-> Entity` work.
+5. Choose the read path:
+   - projection-backed `IQueryable<TEntity>`
+   - MediatR-backed query handler
+6. In `Api/GraphQL/<Feature>`, add:
+   - `*Queries.cs`
+   - `*Mutations.cs` if needed
+   - `*Inputs.cs` if needed
+   - `*Mappings.cs` if needed
+   - `*Types.cs`
+7. Register GraphQL types/extensions in DI.
+8. Add tests in the owning backend test project.
 
-When adding a new feature:
-1. add or update application tests for the use case
-2. add API tests for the exposed contract if the feature is public
-3. add infrastructure tests if a new adapter or external integration is introduced
-4. verify architecture boundaries still hold
+## Verification
 
-## Refactor Guidance
-If you are unsure where new code belongs, follow this order:
-1. start with the use case in `Application`
-2. add or reuse domain entities and enums in `Domain`
-3. add persistence wiring in `Persistence` if data storage is involved
-4. add infrastructure implementations in `Infrastructure` if an external capability is required
-5. expose the use case through REST and/or GraphQL in `Api`
+Recommended backend verification after structural or architectural changes:
 
-This order keeps the backend centered on business workflows instead of transport or framework details.
+```bash
+dotnet build src/backend/src/LastMile.TMS.Application/LastMile.TMS.Application.csproj --no-restore
+dotnet build src/backend/src/LastMile.TMS.Api/LastMile.TMS.Api.csproj --no-restore
+dotnet test src/backend/tests/LastMile.TMS.Application.Tests/LastMile.TMS.Application.Tests.csproj --no-build
+dotnet test src/backend/tests/LastMile.TMS.Api.Tests/LastMile.TMS.Api.Tests.csproj --no-build -- RunConfiguration.MaxCpuCount=1
+```
+
+Add broader test scopes when the change touches other backend layers.

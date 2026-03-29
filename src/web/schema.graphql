@@ -1,0 +1,728 @@
+schema {
+  query: Query
+  mutation: Mutation
+}
+
+type Address {
+  street1: String!
+  street2: String
+  city: String!
+  state: String!
+  postalCode: String!
+  countryCode: String!
+  isResidential: Boolean!
+  contactName: String
+  companyName: String
+  phone: String
+  email: String
+}
+
+type Depot {
+  id: UUID!
+  name: String!
+  address: Address
+  operatingHours: [OperatingHours!]
+  isActive: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime
+}
+
+type Driver {
+  id: UUID!
+  firstName: String!
+  lastName: String!
+  displayName: String! @cost(weight: "10")
+  phone: String
+  email: String
+  depotId: UUID!
+  status: DriverStatus!
+}
+
+type Mutation @authorize(roles: [ "Admin" ]) {
+  createDepot(input: CreateDepotInput!): Depot! @authorize(roles: [ "Admin", "OperationsManager" ]) @cost(weight: "10")
+  updateDepot(id: UUID! input: UpdateDepotInput!): Depot @authorize(roles: [ "Admin", "OperationsManager" ]) @cost(weight: "10")
+  deleteDepot(id: UUID!): Boolean! @authorize(roles: [ "Admin", "OperationsManager" ]) @cost(weight: "10")
+  registerParcel(input: RegisterParcelInput!): RegisteredParcel! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
+  createRoute(input: CreateRouteInput!): Route! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
+  createUser(input: CreateUserInput!): UserManagementUser! @cost(weight: "10")
+  updateUser(input: UpdateUserInput!): UserManagementUser! @cost(weight: "10")
+  deactivateUser(userId: UUID!): UserManagementUser! @cost(weight: "10")
+  sendPasswordResetEmail(userId: UUID!): UserActionResultDto! @cost(weight: "10")
+  requestPasswordReset(email: String!): UserActionResultDto! @allowAnonymous @cost(weight: "10")
+  completePasswordReset(input: CompletePasswordResetInput!): UserActionResultDto! @allowAnonymous @cost(weight: "10")
+  createVehicle(input: CreateVehicleInput!): Vehicle! @authorize(roles: [ "Admin", "OperationsManager" ]) @cost(weight: "10")
+  updateVehicle(id: UUID! input: UpdateVehicleInput!): Vehicle @authorize(roles: [ "Admin", "OperationsManager" ]) @cost(weight: "10")
+  deleteVehicle(id: UUID!): Boolean! @authorize(roles: [ "Admin", "OperationsManager" ]) @cost(weight: "10")
+  createZone(input: CreateZoneInput!): Zone! @authorize(roles: [ "Admin", "OperationsManager" ]) @cost(weight: "10")
+  updateZone(id: UUID! input: UpdateZoneInput!): Zone @authorize(roles: [ "Admin", "OperationsManager" ]) @cost(weight: "10")
+  deleteZone(id: UUID!): Boolean! @authorize(roles: [ "Admin", "OperationsManager" ]) @cost(weight: "10")
+}
+
+type OperatingHours {
+  dayOfWeek: DayOfWeek!
+  openTime: TimeSpan
+  closedTime: TimeSpan
+  isClosed: Boolean!
+}
+
+type ParcelRouteOption {
+  id: UUID!
+  trackingNumber: String!
+  weight: Decimal!
+  weightUnit: WeightUnit!
+}
+
+type Query @authorize(roles: [ "Admin" ]) {
+  depots(order: [DepotSortInput!] @cost(weight: "10") where: DepotFilterInput @cost(weight: "10")): [Depot!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
+  depot(id: UUID!): Depot @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
+  drivers(depotId: UUID): [Driver!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
+  parcelsForRouteCreation: [ParcelRouteOption!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
+  routes(order: [RouteSortInput!] @cost(weight: "10") where: RouteFilterInput @cost(weight: "10")): [Route!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
+  users(search: String isActive: Boolean depotId: UUID zoneId: UUID order: [UserManagementUserSortInput!] @cost(weight: "10") where: UserManagementUserFilterInput @cost(weight: "10")): [UserManagementUser!]! @cost(weight: "10")
+  user(id: UUID!): UserManagementUser @cost(weight: "10")
+  userManagementLookups: UserManagementLookupsDto! @cost(weight: "10")
+  vehicles(order: [VehicleSortInput!] @cost(weight: "10") where: VehicleFilterInput @cost(weight: "10")): [Vehicle!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
+  zones(order: [ZoneSortInput!] @cost(weight: "10") where: ZoneFilterInput @cost(weight: "10")): [Zone!]! @cost(weight: "10")
+  zone(id: UUID!): Zone @cost(weight: "10")
+}
+
+type RegisteredParcel {
+  id: UUID!
+  trackingNumber: String!
+  description: String
+  serviceType: String!
+  status: String!
+  weight: Decimal!
+  weightUnit: String!
+  length: Decimal!
+  width: Decimal!
+  height: Decimal!
+  dimensionUnit: String!
+  declaredValue: Decimal!
+  currency: String!
+  estimatedDeliveryDate: DateTime!
+  deliveryAttempts: Int!
+  parcelType: String
+  zoneId: UUID!
+  zoneName: String
+  depotId: UUID!
+  depotName: String
+  createdAt: DateTime!
+  lastModifiedAt: DateTime
+}
+
+type Route {
+  id: UUID!
+  vehicleId: UUID!
+  vehiclePlate: String @cost(weight: "10")
+  driverId: UUID!
+  driverName: String @cost(weight: "10")
+  startDate: DateTime!
+  endDate: DateTime
+  startMileage: Int!
+  endMileage: Int!
+  totalMileage: Int! @cost(weight: "10")
+  status: RouteStatus!
+  parcelCount: Int! @cost(weight: "10")
+  parcelsDelivered: Int! @cost(weight: "10")
+  createdAt: DateTime!
+}
+
+type UserActionResultDto {
+  success: Boolean!
+  message: String!
+}
+
+type UserManagementDepotOptionDto {
+  id: UUID!
+  name: String!
+}
+
+type UserManagementLookupsDto {
+  roles: [UserManagementRoleOptionDto!]!
+  depots: [UserManagementDepotOptionDto!]!
+  zones: [UserManagementZoneOptionDto!]!
+}
+
+type UserManagementRoleOptionDto {
+  value: UserRole!
+  label: String!
+}
+
+type UserManagementUser {
+  id: UUID!
+  firstName: String!
+  lastName: String!
+  fullName: String! @cost(weight: "10")
+  email: String
+  phone: String
+  role: String @cost(weight: "10")
+  isActive: Boolean!
+  isProtected: Boolean! @cost(weight: "10")
+  depotId: UUID
+  depotName: String @cost(weight: "10")
+  zoneId: UUID
+  zoneName: String @cost(weight: "10")
+  createdAt: DateTime!
+  updatedAt: DateTime
+}
+
+type UserManagementZoneOptionDto {
+  id: UUID!
+  depotId: UUID!
+  name: String!
+}
+
+type Vehicle {
+  id: UUID!
+  registrationPlate: String!
+  type: VehicleType!
+  parcelCapacity: Int!
+  weightCapacity: Decimal!
+  status: VehicleStatus!
+  depotId: UUID!
+  depotName: String @cost(weight: "10")
+  totalRoutes: Int! @cost(weight: "10")
+  routesCompleted: Int! @cost(weight: "10")
+  totalMileage: Int! @cost(weight: "10")
+  createdAt: DateTime!
+  updatedAt: DateTime
+}
+
+type Zone {
+  id: UUID!
+  name: String!
+  boundary: String @cost(weight: "10")
+  isActive: Boolean!
+  depotId: UUID!
+  depotName: String @cost(weight: "10")
+  createdAt: DateTime!
+  updatedAt: DateTime
+}
+
+input AddressFilterInput {
+  and: [AddressFilterInput!]
+  or: [AddressFilterInput!]
+  street1: StringOperationFilterInput
+  street2: StringOperationFilterInput
+  city: StringOperationFilterInput
+  state: StringOperationFilterInput
+  postalCode: StringOperationFilterInput
+  countryCode: StringOperationFilterInput
+  isResidential: BooleanOperationFilterInput
+  contactName: StringOperationFilterInput
+  companyName: StringOperationFilterInput
+  phone: StringOperationFilterInput
+  email: StringOperationFilterInput
+}
+
+input AddressInput {
+  street1: String!
+  street2: String
+  city: String!
+  state: String!
+  postalCode: String!
+  countryCode: String!
+  isResidential: Boolean!
+  contactName: String
+  companyName: String
+  phone: String
+  email: String
+}
+
+input AddressSortInput {
+  street1: SortEnumType @cost(weight: "10")
+  street2: SortEnumType @cost(weight: "10")
+  city: SortEnumType @cost(weight: "10")
+  state: SortEnumType @cost(weight: "10")
+  postalCode: SortEnumType @cost(weight: "10")
+  countryCode: SortEnumType @cost(weight: "10")
+  isResidential: SortEnumType @cost(weight: "10")
+  contactName: SortEnumType @cost(weight: "10")
+  companyName: SortEnumType @cost(weight: "10")
+  phone: SortEnumType @cost(weight: "10")
+  email: SortEnumType @cost(weight: "10")
+}
+
+input BooleanOperationFilterInput {
+  eq: Boolean @cost(weight: "10")
+  neq: Boolean @cost(weight: "10")
+}
+
+input CompletePasswordResetInput {
+  email: String!
+  token: String!
+  newPassword: String!
+}
+
+input CreateDepotInput {
+  name: String!
+  address: AddressInput!
+  operatingHours: [OperatingHoursInput!]
+  isActive: Boolean!
+}
+
+input CreateRouteInput {
+  vehicleId: UUID!
+  driverId: UUID!
+  startDate: DateTime!
+  startMileage: Int!
+  parcelIds: [UUID!]!
+}
+
+input CreateUserInput {
+  firstName: String!
+  lastName: String!
+  email: String!
+  phone: String
+  role: UserRole!
+  depotId: UUID
+  zoneId: UUID
+}
+
+input CreateVehicleInput {
+  registrationPlate: String!
+  type: VehicleType!
+  parcelCapacity: Int!
+  weightCapacity: Decimal!
+  status: VehicleStatus!
+  depotId: UUID!
+}
+
+input CreateZoneInput {
+  name: String!
+  depotId: UUID!
+  isActive: Boolean!
+  geoJson: String
+  coordinates: [[Float!]!]
+  boundaryWkt: String
+}
+
+input DateTimeOperationFilterInput {
+  eq: DateTime @cost(weight: "10")
+  neq: DateTime @cost(weight: "10")
+  in: [DateTime] @cost(weight: "10")
+  nin: [DateTime] @cost(weight: "10")
+  gt: DateTime @cost(weight: "10")
+  ngt: DateTime @cost(weight: "10")
+  gte: DateTime @cost(weight: "10")
+  ngte: DateTime @cost(weight: "10")
+  lt: DateTime @cost(weight: "10")
+  nlt: DateTime @cost(weight: "10")
+  lte: DateTime @cost(weight: "10")
+  nlte: DateTime @cost(weight: "10")
+}
+
+input DayOfWeekOperationFilterInput {
+  eq: DayOfWeek @cost(weight: "10")
+  neq: DayOfWeek @cost(weight: "10")
+  in: [DayOfWeek!] @cost(weight: "10")
+  nin: [DayOfWeek!] @cost(weight: "10")
+}
+
+input DecimalOperationFilterInput {
+  eq: Decimal @cost(weight: "10")
+  neq: Decimal @cost(weight: "10")
+  in: [Decimal] @cost(weight: "10")
+  nin: [Decimal] @cost(weight: "10")
+  gt: Decimal @cost(weight: "10")
+  ngt: Decimal @cost(weight: "10")
+  gte: Decimal @cost(weight: "10")
+  ngte: Decimal @cost(weight: "10")
+  lt: Decimal @cost(weight: "10")
+  nlt: Decimal @cost(weight: "10")
+  lte: Decimal @cost(weight: "10")
+  nlte: Decimal @cost(weight: "10")
+}
+
+input DepotFilterInput {
+  and: [DepotFilterInput!]
+  or: [DepotFilterInput!]
+  id: UuidOperationFilterInput
+  name: StringOperationFilterInput
+  address: AddressFilterInput
+  operatingHours: OperatingHoursListFilterInput
+  isActive: BooleanOperationFilterInput
+  createdAt: DateTimeOperationFilterInput
+  updatedAt: DateTimeOperationFilterInput
+}
+
+input DepotSortInput {
+  id: SortEnumType @cost(weight: "10")
+  name: SortEnumType @cost(weight: "10")
+  address: AddressSortInput @cost(weight: "10")
+  isActive: SortEnumType @cost(weight: "10")
+  createdAt: SortEnumType @cost(weight: "10")
+  updatedAt: SortEnumType @cost(weight: "10")
+}
+
+input IntOperationFilterInput {
+  eq: Int @cost(weight: "10")
+  neq: Int @cost(weight: "10")
+  in: [Int] @cost(weight: "10")
+  nin: [Int] @cost(weight: "10")
+  gt: Int @cost(weight: "10")
+  ngt: Int @cost(weight: "10")
+  gte: Int @cost(weight: "10")
+  ngte: Int @cost(weight: "10")
+  lt: Int @cost(weight: "10")
+  nlt: Int @cost(weight: "10")
+  lte: Int @cost(weight: "10")
+  nlte: Int @cost(weight: "10")
+}
+
+input OperatingHoursFilterInput {
+  and: [OperatingHoursFilterInput!]
+  or: [OperatingHoursFilterInput!]
+  dayOfWeek: DayOfWeekOperationFilterInput
+  openTime: TimeSpanOperationFilterInput
+  closedTime: TimeSpanOperationFilterInput
+  isClosed: BooleanOperationFilterInput
+}
+
+input OperatingHoursInput {
+  dayOfWeek: DayOfWeek!
+  openTime: String
+  closedTime: String
+  isClosed: Boolean!
+}
+
+input OperatingHoursListFilterInput {
+  all: OperatingHoursFilterInput @cost(weight: "10")
+  none: OperatingHoursFilterInput @cost(weight: "10")
+  some: OperatingHoursFilterInput @cost(weight: "10")
+  any: Boolean @cost(weight: "10")
+}
+
+input RegisterParcelInput {
+  shipperAddressId: UUID!
+  recipientAddress: RegisterParcelRecipientAddressInput!
+  description: String
+  serviceType: ServiceType!
+  weight: Decimal!
+  weightUnit: WeightUnit!
+  length: Decimal!
+  width: Decimal!
+  height: Decimal!
+  dimensionUnit: DimensionUnit!
+  declaredValue: Decimal!
+  currency: String!
+  estimatedDeliveryDate: DateTime!
+  parcelType: String
+}
+
+input RegisterParcelRecipientAddressInput {
+  street1: String!
+  street2: String
+  city: String!
+  state: String!
+  postalCode: String!
+  countryCode: String!
+  isResidential: Boolean!
+  contactName: String
+  companyName: String
+  phone: String
+  email: String
+}
+
+input RouteFilterInput {
+  and: [RouteFilterInput!]
+  or: [RouteFilterInput!]
+  id: UuidOperationFilterInput
+  vehicleId: UuidOperationFilterInput
+  driverId: UuidOperationFilterInput
+  startDate: DateTimeOperationFilterInput
+  endDate: DateTimeOperationFilterInput
+  startMileage: IntOperationFilterInput
+  endMileage: IntOperationFilterInput
+  status: RouteStatusOperationFilterInput
+  createdAt: DateTimeOperationFilterInput
+}
+
+input RouteSortInput {
+  id: SortEnumType @cost(weight: "10")
+  vehicleId: SortEnumType @cost(weight: "10")
+  driverId: SortEnumType @cost(weight: "10")
+  startDate: SortEnumType @cost(weight: "10")
+  endDate: SortEnumType @cost(weight: "10")
+  startMileage: SortEnumType @cost(weight: "10")
+  endMileage: SortEnumType @cost(weight: "10")
+  status: SortEnumType @cost(weight: "10")
+  createdAt: SortEnumType @cost(weight: "10")
+}
+
+input RouteStatusOperationFilterInput {
+  eq: RouteStatus @cost(weight: "10")
+  neq: RouteStatus @cost(weight: "10")
+  in: [RouteStatus!] @cost(weight: "10")
+  nin: [RouteStatus!] @cost(weight: "10")
+}
+
+input StringOperationFilterInput {
+  and: [StringOperationFilterInput!]
+  or: [StringOperationFilterInput!]
+  eq: String @cost(weight: "10")
+  neq: String @cost(weight: "10")
+  contains: String @cost(weight: "20")
+  ncontains: String @cost(weight: "20")
+  in: [String] @cost(weight: "10")
+  nin: [String] @cost(weight: "10")
+  startsWith: String @cost(weight: "20")
+  nstartsWith: String @cost(weight: "20")
+  endsWith: String @cost(weight: "20")
+  nendsWith: String @cost(weight: "20")
+}
+
+input TimeSpanOperationFilterInput {
+  eq: TimeSpan @cost(weight: "10")
+  neq: TimeSpan @cost(weight: "10")
+  in: [TimeSpan] @cost(weight: "10")
+  nin: [TimeSpan] @cost(weight: "10")
+  gt: TimeSpan @cost(weight: "10")
+  ngt: TimeSpan @cost(weight: "10")
+  gte: TimeSpan @cost(weight: "10")
+  ngte: TimeSpan @cost(weight: "10")
+  lt: TimeSpan @cost(weight: "10")
+  nlt: TimeSpan @cost(weight: "10")
+  lte: TimeSpan @cost(weight: "10")
+  nlte: TimeSpan @cost(weight: "10")
+}
+
+input UpdateDepotInput {
+  name: String!
+  address: AddressInput
+  operatingHours: [OperatingHoursInput!]
+  isActive: Boolean!
+}
+
+input UpdateUserInput {
+  id: UUID!
+  firstName: String!
+  lastName: String!
+  email: String!
+  phone: String
+  role: UserRole!
+  depotId: UUID
+  zoneId: UUID
+  isActive: Boolean!
+}
+
+input UpdateVehicleInput {
+  registrationPlate: String!
+  type: VehicleType!
+  parcelCapacity: Int!
+  weightCapacity: Decimal!
+  status: VehicleStatus!
+  depotId: UUID!
+}
+
+input UpdateZoneInput {
+  name: String!
+  depotId: UUID!
+  isActive: Boolean!
+  geoJson: String
+  coordinates: [[Float!]!]
+  boundaryWkt: String
+}
+
+input UserManagementUserFilterInput {
+  and: [UserManagementUserFilterInput!]
+  or: [UserManagementUserFilterInput!]
+  id: UuidOperationFilterInput
+  firstName: StringOperationFilterInput
+  lastName: StringOperationFilterInput
+  email: StringOperationFilterInput
+  phone: StringOperationFilterInput
+  isActive: BooleanOperationFilterInput
+  depotId: UuidOperationFilterInput
+  zoneId: UuidOperationFilterInput
+  createdAt: DateTimeOperationFilterInput
+  updatedAt: DateTimeOperationFilterInput
+}
+
+input UserManagementUserSortInput {
+  id: SortEnumType @cost(weight: "10")
+  firstName: SortEnumType @cost(weight: "10")
+  lastName: SortEnumType @cost(weight: "10")
+  email: SortEnumType @cost(weight: "10")
+  phone: SortEnumType @cost(weight: "10")
+  isActive: SortEnumType @cost(weight: "10")
+  depotId: SortEnumType @cost(weight: "10")
+  zoneId: SortEnumType @cost(weight: "10")
+  createdAt: SortEnumType @cost(weight: "10")
+  updatedAt: SortEnumType @cost(weight: "10")
+}
+
+input UuidOperationFilterInput {
+  eq: UUID @cost(weight: "10")
+  neq: UUID @cost(weight: "10")
+  in: [UUID] @cost(weight: "10")
+  nin: [UUID] @cost(weight: "10")
+  gt: UUID @cost(weight: "10")
+  ngt: UUID @cost(weight: "10")
+  gte: UUID @cost(weight: "10")
+  ngte: UUID @cost(weight: "10")
+  lt: UUID @cost(weight: "10")
+  nlt: UUID @cost(weight: "10")
+  lte: UUID @cost(weight: "10")
+  nlte: UUID @cost(weight: "10")
+}
+
+input VehicleFilterInput {
+  and: [VehicleFilterInput!]
+  or: [VehicleFilterInput!]
+  id: UuidOperationFilterInput
+  registrationPlate: StringOperationFilterInput
+  type: VehicleTypeOperationFilterInput
+  parcelCapacity: IntOperationFilterInput
+  weightCapacity: DecimalOperationFilterInput
+  status: VehicleStatusOperationFilterInput
+  depotId: UuidOperationFilterInput
+  createdAt: DateTimeOperationFilterInput
+  updatedAt: DateTimeOperationFilterInput
+}
+
+input VehicleSortInput {
+  id: SortEnumType @cost(weight: "10")
+  registrationPlate: SortEnumType @cost(weight: "10")
+  type: SortEnumType @cost(weight: "10")
+  parcelCapacity: SortEnumType @cost(weight: "10")
+  weightCapacity: SortEnumType @cost(weight: "10")
+  status: SortEnumType @cost(weight: "10")
+  depotId: SortEnumType @cost(weight: "10")
+  createdAt: SortEnumType @cost(weight: "10")
+  updatedAt: SortEnumType @cost(weight: "10")
+}
+
+input VehicleStatusOperationFilterInput {
+  eq: VehicleStatus @cost(weight: "10")
+  neq: VehicleStatus @cost(weight: "10")
+  in: [VehicleStatus!] @cost(weight: "10")
+  nin: [VehicleStatus!] @cost(weight: "10")
+}
+
+input VehicleTypeOperationFilterInput {
+  eq: VehicleType @cost(weight: "10")
+  neq: VehicleType @cost(weight: "10")
+  in: [VehicleType!] @cost(weight: "10")
+  nin: [VehicleType!] @cost(weight: "10")
+}
+
+input ZoneFilterInput {
+  and: [ZoneFilterInput!]
+  or: [ZoneFilterInput!]
+  id: UuidOperationFilterInput
+  name: StringOperationFilterInput
+  isActive: BooleanOperationFilterInput
+  depotId: UuidOperationFilterInput
+  createdAt: DateTimeOperationFilterInput
+  updatedAt: DateTimeOperationFilterInput
+}
+
+input ZoneSortInput {
+  id: SortEnumType @cost(weight: "10")
+  name: SortEnumType @cost(weight: "10")
+  isActive: SortEnumType @cost(weight: "10")
+  depotId: SortEnumType @cost(weight: "10")
+  createdAt: SortEnumType @cost(weight: "10")
+  updatedAt: SortEnumType @cost(weight: "10")
+}
+
+"Defines when a policy shall be executed."
+enum ApplyPolicy {
+  "Before the resolver was executed."
+  BEFORE_RESOLVER
+  "After the resolver was executed."
+  AFTER_RESOLVER
+  "The policy is applied in the validation step before the execution."
+  VALIDATION
+}
+
+enum DayOfWeek {
+  SUNDAY
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+}
+
+enum DimensionUnit {
+  IN
+  CM
+}
+
+enum DriverStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  SUSPENDED
+}
+
+enum RouteStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ServiceType {
+  ECONOMY
+  STANDARD
+  EXPRESS
+  OVERNIGHT
+}
+
+enum SortEnumType {
+  ASC
+  DESC
+}
+
+enum UserRole {
+  Admin
+  OperationsManager
+  Dispatcher
+  WarehouseOperator
+  Driver
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+  RETIRED
+}
+
+enum VehicleType {
+  VAN
+  CAR
+  BIKE
+}
+
+enum WeightUnit {
+  LB
+  KG
+}
+
+directive @allowAnonymous repeatable on FIELD_DEFINITION
+
+"The authorize directive."
+directive @authorize("The name of the authorization policy that determines access to the annotated resource." policy: String "Roles that are allowed to access the annotated resource." roles: [String!] "Defines when when the authorize directive shall be applied.By default the authorize directives are applied during the validation phase." apply: ApplyPolicy! = BEFORE_RESOLVER) repeatable on OBJECT | FIELD_DEFINITION
+
+"The purpose of the `cost` directive is to define a `weight` for GraphQL types, fields, and arguments. Static analysis can use these weights when calculating the overall cost of a query or response."
+directive @cost("The `weight` argument defines what value to add to the overall cost for every appearance, or possible appearance, of a type, field, argument, etc." weight: String!) on SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | ENUM | INPUT_FIELD_DEFINITION
+
+"The `@specifiedBy` directive is used within the type system definition language to provide a URL for specifying the behavior of custom scalar definitions."
+directive @specifiedBy("The specifiedBy URL points to a human-readable specification. This field will only read a result for scalar types." url: String!) on SCALAR
+
+"The `DateTime` scalar represents an ISO-8601 compliant date time type."
+scalar DateTime @specifiedBy(url: "https:\/\/www.graphql-scalars.com\/date-time")
+
+"The `Decimal` scalar type represents a decimal floating-point number."
+scalar Decimal
+
+"The `TimeSpan` scalar represents an ISO-8601 compliant duration type."
+scalar TimeSpan
+
+scalar UUID @specifiedBy(url: "https:\/\/tools.ietf.org\/html\/rfc4122")

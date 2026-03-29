@@ -1,34 +1,50 @@
 # Web Architecture Guide
 
-This document defines the target architecture for `src/web/src`.
-It describes the structure we actively maintain. Old layouts and deprecated import paths are not part of the architecture, even if they still appear in git history.
+## Purpose
+This document describes the accepted architecture for `src/web/src`.
+It reflects the structure we maintain today. We are not forcing a large feature-folder rewrite right now.
+
+## Current Position
+The frontend is acceptable as a layered Next.js app with domain-based modules spread across shared folders:
+- `app/` for routing and composition
+- `components/` for page and UI building blocks
+- `queries/` for TanStack Query hooks
+- `services/` for request orchestration
+- `graphql/` for documents, generated artifacts, and domain re-export modules
+- `types/` for UI-local contracts
+
+The goal is consistency inside this layout, not a broad move to `features/*` at this time.
 
 ## Core Principles
-
-1. Organize by layer first, then by domain inside the layer.
-2. Use backend domain names as the canonical vocabulary:
-   `depots`, `drivers`, `parcels`, `routes`, `users`, `vehicles`, `zones`.
-3. Keep `app/` thin. Routes compose pages; they do not own feature logic.
-4. Keep data flow consistent:
-   page or component -> query hook -> service -> GraphQL client.
-5. Keep `components/ui` primitive-only. Business behavior belongs elsewhere.
-6. Keep `lib/` for shared non-React helpers, validation, navigation, networking, and labels.
-7. Keep `hooks/` for generic React or browser hooks only.
-8. Prefer explicit naming over catch-all folders such as `common`, `helpers`, or `misc`.
+- Keep routes thin. `app/` should compose pages, not hold feature behavior.
+- Keep GraphQL schema-driven. Generated GraphQL artifacts are the transport source of truth.
+- Keep components talking to query hooks, not directly to services.
+- Keep services thin. They prepare variables, auth tokens, mock branching, and small UI-facing normalization.
+- Keep domain vocabulary aligned with the backend:
+  - `depots`
+  - `drivers`
+  - `parcels`
+  - `routes`
+  - `users`
+  - `vehicles`
+  - `zones`
+- Keep shared UI truly shared. Domain-specific UI belongs in the owning domain folder.
+- Prefer local UI models only when they add value beyond raw GraphQL shapes.
 
 ## Stack
-
-- Framework: Next.js 16 App Router
-- UI: React 19, Tailwind CSS 4, shadcn primitives
-- Server state: TanStack Query
-- Forms: react-hook-form + Zod
-- Auth: NextAuth credentials flow against OpenIddict
-- Tests: Vitest + Playwright
+- Next.js 16 App Router
+- React 19
+- Tailwind CSS 4
+- TanStack Query
+- NextAuth
+- GraphQL codegen
+- Vitest for unit/component testing
+- Playwright for end-to-end flows
 
 ## Canonical Folder Tree
 
 ```text
-src/
+src/web/src/
   app/
     (auth)/
     (dashboard)/
@@ -54,6 +70,8 @@ src/
     zones/
 
   graphql/
+    documents/
+    generated/
     depots.ts
     drivers.ts
     parcels.ts
@@ -63,345 +81,224 @@ src/
     zones.ts
 
   hooks/
-    use-debounce.ts
-    use-floating-dropdown-position.ts
-
   lib/
-    auth.ts
-    utils.ts
-    depots/
-    forms/
-    labels/
-    navigation/
-    network/
-    parcels/
-    query/
-    toast/
-    validation/
-
   mocks/
   queries/
   services/
   types/
-  proxy.ts
 ```
 
-## Layer Contracts
+## Layer Responsibilities
 
 ### `app/`
-
 Purpose:
 - route files
-- layouts
+- route-group layouts
 - top-level providers
-- redirects and route entry points
+- redirects and auth gates
 
 Rules:
-- keep route files thin
-- move large tables, dialogs, forms, and detail pages into `components/`
-- auth and dashboard route groups own composition, not business logic
-- legacy URLs may redirect from `app/admin/*` into canonical dashboard routes
+- route files stay thin
+- page files usually just render a page component from `components/`
+- server-side auth checks are allowed here when the page needs a token or role gate
+
+Examples:
+- thin composition page: [page.tsx](/C:/Users/mesut/source/repos/lastmile-tms-team2/src/web/src/app/(dashboard)/vehicles/page.tsx)
+- server-auth page passing token downward: [page.tsx](/C:/Users/mesut/source/repos/lastmile-tms-team2/src/web/src/app/(dashboard)/users/page.tsx)
 
 ### `components/`
-
 Purpose:
-- reusable UI composed for this product
-- feature and domain presentation
-- page-level client components extracted out of `app/`
-
-Structure:
-- `components/ui`: shadcn-style primitives only
-- `components/form`: reusable custom inputs and selectors
-- `components/feedback`: alerts and query-state feedback
-- `components/list`: list/table/page-shell building blocks
-- `components/detail`: detail/edit page shells and form scaffolding
-- `components/layout`: app chrome such as sidebar and header
-- `components/auth`, `dashboard`, `depots`, `routes`, `users`, `vehicles`, `zones`: domain-specific components
+- page-level UI
+- domain presentation
+- reusable product components
+- shared primitives in `components/ui`
 
 Rules:
-- no domain logic in `components/ui`
-- no new `components/common`
-- shared components should move into the narrowest folder that matches their purpose
-- if a component knows about a specific entity, keep it under that entity folder
+- `components/ui` is primitive-only
+- domain-specific pages and dialogs live under the matching domain folder
+- shared table/detail/form shells live in the matching shared folder, not in `ui`
+
+Examples:
+- domain page: [vehicles-page.tsx](/C:/Users/mesut/source/repos/lastmile-tms-team2/src/web/src/components/vehicles/vehicles-page.tsx)
+- domain-heavy admin page: [user-management-page.tsx](/C:/Users/mesut/source/repos/lastmile-tms-team2/src/web/src/components/users/user-management-page.tsx)
 
 ### `queries/`
-
 Purpose:
 - TanStack Query hooks
-- query keys
-- mutations with cache invalidation
+- cache keys
+- invalidation policy
+- mutation success behavior
 
 Rules:
-- components call queries, not services directly, unless there is a strong non-React reason
-- query modules are domain-based: `queries/users.ts`, `queries/zones.ts`, etc.
-- mutation toast metadata belongs here or in shared query helpers, not in page files
+- components call hooks from `queries/`
+- hooks call services from `services/`
+- query modules are domain-based
+
+Accepted auth patterns:
+- hook reads auth state itself for normal dashboard flows
+- hook receives `accessToken` when a server page already resolved auth
+
+Both patterns are acceptable today. Do not mix them inside the same domain module without a reason.
+
+Examples:
+- session-aware hooks: [vehicles.ts](/C:/Users/mesut/source/repos/lastmile-tms-team2/src/web/src/queries/vehicles.ts)
+- token-parameter hooks: [users.ts](/C:/Users/mesut/source/repos/lastmile-tms-team2/src/web/src/queries/users.ts)
 
 ### `services/`
-
 Purpose:
-- domain API operations
-- request and response mapping
-- GraphQL variable construction
-- domain-level normalization
+- domain request orchestration
+- token-aware GraphQL calls
+- mock-vs-real branching
+- light normalization into stable UI models
 
 Rules:
-- services do not render UI
-- services do not import React
-- services import GraphQL documents from `graphql/`
-- enum serialization and mapping belong in the owning service, not in a shared GraphQL helper
+- no React in services
+- no JSX in services
+- services do not own cache behavior
+- services should consume typed GraphQL documents or domain GraphQL barrel exports
+- small UI-facing normalization is allowed
+
+Examples:
+- normalized service object style: [vehicles.service.ts](/C:/Users/mesut/source/repos/lastmile-tms-team2/src/web/src/services/vehicles.service.ts)
+- function-based service style: [users.service.ts](/C:/Users/mesut/source/repos/lastmile-tms-team2/src/web/src/services/users.service.ts)
+
+Both export styles are acceptable. Prefer consistency within a given domain over repo-wide mechanical rewrites.
 
 ### `graphql/`
-
 Purpose:
-- document strings only
+- `.graphql` operation documents
+- generated codegen output
+- stable domain re-export modules
+
+Structure:
+- `graphql/documents/`: operation documents grouped by domain file
+- `graphql/generated/`: codegen output
+- `graphql/<domain>.ts`: stable import surface re-exporting generated documents and types
 
 Rules:
-- one file per domain
-- no React, no fetch logic, no enum mapping
-- examples: `graphql/vehicles.ts`, `graphql/users.ts`
+- `.graphql` files are the source of truth for frontend GraphQL operations
+- generated artifacts are never hand-edited
+- prefer importing domain-level GraphQL barrels from services instead of spreading `generated` imports everywhere
+
+Examples:
+- document file: [vehicles.graphql](/C:/Users/mesut/source/repos/lastmile-tms-team2/src/web/src/graphql/documents/vehicles.graphql)
+- domain re-export: [vehicles.ts](/C:/Users/mesut/source/repos/lastmile-tms-team2/src/web/src/graphql/vehicles.ts)
+
+### `types/`
+Purpose:
+- UI-local models
+- form payloads
+- request types passed between component, hook, and service layers
+- local shapes that intentionally differ from raw GraphQL transport shapes
+
+Rules:
+- generated GraphQL types remain the source of truth for transport contracts
+- local `types/*` are allowed when the service normalizes GraphQL data into a UI model
+- avoid creating a second schema mirror without value
+
+Examples:
+- local UI model around generated enums: [vehicles.ts](/C:/Users/mesut/source/repos/lastmile-tms-team2/src/web/src/types/vehicles.ts)
+- user management local request and view models: [users.ts](/C:/Users/mesut/source/repos/lastmile-tms-team2/src/web/src/types/users.ts)
 
 ### `hooks/`
-
 Purpose:
-- generic hooks that are not tied to one domain
+- generic reusable hooks not tied to one backend domain
 
 Rules:
-- keep only reusable React or browser hooks here
-- entity data hooks belong in `queries/`, not `hooks/`
-- deprecated: `lib/hooks/*`
+- domain data hooks belong in `queries/`
+- keep `hooks/` for generic React/browser behavior only
 
 ### `lib/`
-
 Purpose:
 - cross-cutting helpers that are not components and not query hooks
 
-Allowed subfolders:
-- `lib/network/`: low-level network and GraphQL client helpers
-- `lib/query/`: query client and mutation integration helpers
-- `lib/navigation/`: dashboard nav and layout constants
-- `lib/validation/`: Zod schemas and field validators
-- `lib/labels/`: shared label, badge, and display helpers
-- `lib/forms/`: shared option builders and non-visual form helpers
-- `lib/depots/`: depot-specific pure helpers shared across layers
-- `lib/parcels/`: parcel-specific pure helpers shared across layers
-- `lib/toast/`: application toast wrapper
-
-Root exceptions:
-- `lib/auth.ts`
-- `lib/utils.ts`
+Current accepted subfolders include:
+- `lib/network/`
+- `lib/query/`
+- `lib/navigation/`
+- `lib/validation/`
+- `lib/toast/`
+- small domain helper folders such as `lib/depots/` or `lib/parcels/` when the helper is not a service and not UI
 
 Rules:
-- no React hooks in `lib/`
-- do not put entity data access in `lib/api/*`
-- do not recreate catch-all files like `validations.ts`
-
-### `types/`
-
-Purpose:
-- domain contracts and shared transport types
-
-Rules:
-- file names use backend domain terms
-- shared transport wrappers live in `types/api.ts`
-- shared non-visual form types live in `types/forms.ts`
-- UI components must not be the source of shared domain types
-
-## Allowed Import Direction
-
-Preferred direction:
-
-```text
-app -> components -> queries -> services -> graphql
-                         |          |
-                         v          v
-                        types      lib
-```
-
-Allowed:
-- `app` may import `components`, `lib`, `types`, and `auth`
-- `components` may import `queries`, `hooks`, `lib`, `types`, and `ui` primitives
-- `queries` may import `services`, `types`, and `lib/query`
-- `services` may import `graphql`, `lib/network`, `lib/*` pure helpers, and `types`
-
-Do not do this:
-- `services` importing `queries`
-- `graphql` importing `services`
-- `components/ui` importing domain types or domain services
-- `hooks/` duplicating entity-fetching behavior from `queries/`
-- `lib/` depending on component implementation types
+- keep helpers small and focused
+- do not move domain API orchestration into `lib`
+- no React hooks in `lib`
 
 ## Data Flow
 
-Standard request flow:
+### Standard dashboard flow
 
-1. A page component or client component reads route params and UI state.
-2. The component calls a domain hook from `queries/`.
-3. The query hook calls a function from `services/`.
-4. The service builds variables and calls the GraphQL client.
-5. The service normalizes the response into app-facing types.
-6. The query hook manages caching and invalidation.
-7. The component renders UI and mutation states.
+```text
+app page
+-> domain component
+-> query hook
+-> service
+-> graphql/<domain>.ts re-export
+-> graphql/generated typed document
+-> shared GraphQL client
+-> response
+-> optional service normalization
+-> query cache
+-> component render
+```
 
-This flow applies to all entities, including `depots` and `zones`.
+### Server-auth page flow
 
-## Auth and Runtime Flow
+```text
+server page in app/
+-> auth / role gate
+-> pass accessToken to client component
+-> query hook(accessToken)
+-> service(accessToken)
+-> GraphQL client
+```
 
-- `app/providers.tsx` wires `SessionProvider`, `QueryClientProvider`, toasts, and React Query Devtools.
-- `lib/auth.ts` owns NextAuth configuration and token refresh behavior.
-- `proxy.ts` guards protected routes and redirects unauthenticated users to `/login`.
-- `app/(auth)` contains public auth screens.
-- `app/(dashboard)` contains protected routes and dashboard layout composition.
+This pattern is valid for admin-style pages such as users.
 
-## Naming Rules
+## Naming and Structure Rules
+- Use backend feature names for domains.
+- Keep file names kebab-case in the web app unless framework conventions require otherwise.
+- Keep route pages thin and domain pages in `components/<domain>/`.
+- Keep one domain module per file in `queries/`, `services/`, and `graphql/documents/`.
+- Use domain GraphQL barrel files as stable imports from services.
 
-- Use backend names for files and modules: `users`, not `user-management`; `zones`, not `zone`.
-- Use kebab-case for file names except where framework conventions require otherwise.
-- Keep page entrypoints named `page.tsx`; keep extracted component files descriptive, such as `vehicles-page.tsx` or `route-detail-page.tsx`.
-- Prefer singular component names and plural domain module names.
+## What We Intentionally Keep As-Is
+- We are not forcing a move to `features/*` right now.
+- We are not rewriting every service to the same export style unless there is a concrete need.
+- We accept both:
+  - session-aware query hooks
+  - token-parameter query hooks
+- We accept local UI/request types in `types/` when they represent a deliberate UI model instead of raw transport.
 
-## What Belongs Where
+The standard here is operational consistency, not maximal structural purity.
 
-### `components/ui`
+## Preferred Direction for New Code
+- add new page entrypoints in `app/`
+- add domain UI in `components/<domain>/`
+- add cache logic in `queries/<domain>.ts`
+- add request orchestration in `services/<domain>.service.ts`
+- add `.graphql` operations in `graphql/documents/<domain>.graphql`
+- regenerate `graphql/generated/`
+- add local UI types only when needed
 
-Belongs here:
-- `button.tsx`
-- `card.tsx`
-- `input.tsx`
-- `label.tsx`
-- future shadcn-generated primitives
+## Avoid
+- direct service calls from components
+- raw GraphQL strings inside services
+- editing generated GraphQL files by hand
+- putting business page logic into `app/` route files
+- moving shared primitives into domain folders
+- creating broad catch-all folders such as `common`, `helpers`, or `api` when a narrower existing folder fits
 
-Does not belong here:
-- date-time pickers
-- filter dropdowns
-- domain-specific status filters
-- query error wrappers
-- table cells with business meaning
+## Verification
 
-### `components/form`
+Recommended frontend verification after structural or architectural changes:
 
-Belongs here:
-- reusable custom inputs
-- dropdown wrappers
-- listbox-based selectors
-- numeric input controls
+```bash
+cd src/web
+npm run codegen
+npm run test:run
+npm run build
+```
 
-Examples:
-- `date-time-picker.tsx`
-- `select-dropdown.tsx`
-- `weight-capacity-input.tsx`
-
-### `components/feedback`
-
-Belongs here:
-- query and mutation error display
-- empty-state or retry shells that are presentation-focused
-
-### `components/list`
-
-Belongs here:
-- list/table shells
-- pagination controls
-- reusable data-table helpers
-- generic table cells such as overflow tooltip rendering
-
-### Domain component folders
-
-Belongs here:
-- entity-specific filters
-- entity page clients
-- entity forms and dialogs
-- row actions tied to one domain
-
-Examples:
-- vehicle status filter -> `components/vehicles/`
-- route status filter -> `components/routes/`
-- user management page -> `components/users/`
-
-### `queries`
-
-Belongs here:
-- `useUsers`
-- `useZones`
-- query keys
-- mutation invalidation rules
-
-Does not belong here:
-- raw GraphQL document strings
-- presentational toast components
-
-### `services`
-
-Belongs here:
-- `users.service.ts`
-- `zones.service.ts`
-- domain-specific mapping helpers
-
-Does not belong here:
-- React hooks
-- JSX
-- query cache logic
-
-### `graphql`
-
-Belongs here:
-- `USERS_LIST`
-- `CREATE_VEHICLE`
-- `ZONE_BY_ID`
-
-Does not belong here:
-- `graphqlRequest`
-- enum conversion helpers
-- domain normalization
-
-### `lib`
-
-Belongs here:
-- `lib/network/graphql-client.ts`
-- `lib/query/query-client.ts`
-- `lib/navigation/dashboard-nav.ts`
-- `lib/validation/users.ts`
-- `lib/forms/depots.ts`
-- `lib/depots/operating-hours.ts`
-
-Does not belong here:
-- entity query hooks
-- page components
-- domain service modules
-
-## Deprecated Structure
-
-These paths are deprecated and must not be reintroduced:
-
-- `components/common`
-- `lib/hooks`
-- `lib/api`
-- `graphql/operations.ts`
-- `graphql/enum-maps.ts`
-- `lib/validations.ts`
-- domain names that drift from backend vocabulary such as `user-management.ts` or `zone.ts`
-
-## Testing Rules
-
-- Unit and component tests live next to the code they cover or in the layer test folder that already owns that module.
-- Every move or rename must keep tests aligned with the new canonical import path.
-- Minimum validation for structural refactors:
-  - `npm run build`
-  - `npm run test:run`
-- E2E coverage should protect the main auth and dashboard flows:
-  - login
-  - navigation
-  - vehicles
-  - users
-  - depots and zones when their CRUD flow changes
-
-## Refactor Checklist
-
-Use this checklist when adding or moving code:
-
-1. Pick the domain-first name that matches the backend.
-2. Put route composition in `app/` and feature logic in `components/`.
-3. Put data fetching in `queries/`, not `hooks/`.
-4. Put API mapping in `services/`, not `components/`.
-5. Put GraphQL strings in the matching `graphql/<domain>.ts`.
-6. Keep shared types in `types/`, not inside visual components.
-7. If a module does not fit a contract, move it before adding more code around it.
+Add Playwright coverage when navigation or core CRUD flows change.

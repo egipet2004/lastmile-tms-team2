@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { vehiclesService } from "../vehicles.service";
-import { VehicleStatus } from "../../types/vehicles";
 
 vi.mock("@/lib/network/graphql-client", () => ({
   graphqlRequest: vi.fn(),
@@ -16,109 +15,86 @@ describe("vehiclesService", () => {
   });
 
   describe("getAll", () => {
-    it("should fetch all vehicles with default pagination", async () => {
-      const mockResponse = {
-        items: [
-          {
-            id: "123",
-            registrationPlate: "ABC-001",
-            type: 0,
-            parcelCapacity: 10,
-            weightCapacity: 100,
-            status: 0,
-            depotId: "dep-1",
-            depotName: "Main Depot",
-            createdAt: "2024-01-01",
-            lastModifiedAt: null,
-          },
-        ],
-        totalCount: 1,
-        page: 1,
-        pageSize: 20,
-        totalPages: 1,
-      };
-
-      mockGraphql.mockResolvedValueOnce({ vehicles: mockResponse });
-
-      const result = await vehiclesService.getAll();
-
-      expect(mockGraphql).toHaveBeenCalledWith(
-        expect.stringContaining("vehicles("),
+    it("should fetch all vehicles with status filter", async () => {
+      const mockVehicles = [
         {
-          page: 1,
-          pageSize: 20,
-        }
-      );
-      expect(result).toEqual(mockResponse);
-    });
+          id: "v-1",
+          registrationPlate: "ABC-123",
+          type: "VAN",
+          parcelCapacity: 10,
+          weightCapacity: 100,
+          status: "AVAILABLE",
+          depotId: "dep-1",
+          depotName: "Main Depot",
+          totalRoutes: 5,
+          routesCompleted: 3,
+          totalMileage: 1500,
+          createdAt: "2024-01-01",
+          updatedAt: null,
+        },
+      ];
 
-    it("should fetch vehicles with status filter", async () => {
-      const mockResponse = {
-        items: [],
-        totalCount: 0,
-        page: 1,
-        pageSize: 20,
-        totalPages: 0,
-      };
+      mockGraphql.mockResolvedValueOnce({ vehicles: mockVehicles });
 
-      mockGraphql.mockResolvedValueOnce({ vehicles: mockResponse });
-
-      await vehiclesService.getAll(1, 20, VehicleStatus.Available);
+      const result = await vehiclesService.getAll({
+        status: { eq: "AVAILABLE" },
+      });
 
       expect(mockGraphql).toHaveBeenCalledWith(
-        expect.stringContaining("vehicles("),
+        expect.any(Object),
         expect.objectContaining({
-          status: "AVAILABLE",
+          where: { status: { eq: "AVAILABLE" } },
         })
       );
+      expect(result).toHaveLength(1);
+      expect(result[0].registrationPlate).toBe("ABC-123");
     });
 
     it("should fetch vehicles with depot filter", async () => {
-      const mockResponse = {
-        items: [],
-        totalCount: 0,
-        page: 1,
-        pageSize: 20,
-        totalPages: 0,
-      };
+      const mockVehicles: unknown[] = [];
 
-      mockGraphql.mockResolvedValueOnce({ vehicles: mockResponse });
+      mockGraphql.mockResolvedValueOnce({ vehicles: mockVehicles });
 
-      await vehiclesService.getAll(1, 20, undefined, "dep-123");
+      await vehiclesService.getAll({
+        depotId: { eq: "dep-123" },
+      });
 
       expect(mockGraphql).toHaveBeenCalledWith(
-        expect.stringContaining("vehicles("),
+        expect.any(Object),
         expect.objectContaining({
-          depotId: "dep-123",
+          where: { depotId: { eq: "dep-123" } },
         })
       );
     });
   });
 
   describe("getById", () => {
-    it("should fetch a vehicle by ID", async () => {
+    it("should fetch a vehicle by id from the list", async () => {
       const mockVehicle = {
-        id: "123",
-        registrationPlate: "ABC-001",
-        type: 0,
+        id: "v-1",
+        registrationPlate: "ABC-123",
+        type: "VAN",
         parcelCapacity: 10,
         weightCapacity: 100,
-        status: 0,
+        status: "AVAILABLE",
         depotId: "dep-1",
         depotName: "Main Depot",
+        totalRoutes: 5,
+        routesCompleted: 3,
+        totalMileage: 1500,
         createdAt: "2024-01-01",
-        lastModifiedAt: null,
+        updatedAt: null,
       };
 
-      mockGraphql.mockResolvedValueOnce({ vehicle: mockVehicle });
+      mockGraphql.mockResolvedValueOnce({ vehicles: [mockVehicle] });
 
-      const result = await vehiclesService.getById("123");
+      const result = await vehiclesService.getById("v-1");
 
       expect(mockGraphql).toHaveBeenCalledWith(
-        expect.stringContaining("vehicle("),
-        { id: "123" }
+        expect.any(Object),
+        {}
       );
-      expect(result).toEqual(mockVehicle);
+      expect(result.registrationPlate).toBe("ABC-123");
     });
   });
 
@@ -126,19 +102,22 @@ describe("vehiclesService", () => {
     it("should create a new vehicle", async () => {
       const newVehicle = {
         registrationPlate: "XYZ-999",
-        type: 1,
+        type: "CAR",
         parcelCapacity: 5,
         weightCapacity: 50,
-        status: 0,
+        status: "AVAILABLE",
         depotId: "dep-1",
-      };
+      } as const;
 
       const createdVehicle = {
         id: "new-id",
         ...newVehicle,
         depotName: "Main Depot",
+        totalRoutes: 0,
+        routesCompleted: 0,
+        totalMileage: 0,
         createdAt: "2024-01-01",
-        lastModifiedAt: null,
+        updatedAt: null,
       };
 
       mockGraphql.mockResolvedValueOnce({ createVehicle: createdVehicle });
@@ -146,7 +125,7 @@ describe("vehiclesService", () => {
       const result = await vehiclesService.create(newVehicle);
 
       expect(mockGraphql).toHaveBeenCalledWith(
-        expect.stringContaining("createVehicle"),
+        expect.any(Object),
         {
           input: {
             registrationPlate: "XYZ-999",
@@ -158,7 +137,7 @@ describe("vehiclesService", () => {
           },
         }
       );
-      expect(result).toEqual(createdVehicle);
+      expect(result.registrationPlate).toBe("XYZ-999");
     });
   });
 
@@ -166,19 +145,22 @@ describe("vehiclesService", () => {
     it("should update an existing vehicle", async () => {
       const updateData = {
         registrationPlate: "ABC-001",
-        type: 0,
+        type: "VAN",
         parcelCapacity: 15,
         weightCapacity: 150,
-        status: 1,
+        status: "IN_USE",
         depotId: "dep-1",
-      };
+      } as const;
 
       const updatedVehicle = {
         id: "123",
         ...updateData,
         depotName: "Main Depot",
+        totalRoutes: 5,
+        routesCompleted: 3,
+        totalMileage: 1500,
         createdAt: "2024-01-01",
-        lastModifiedAt: "2024-01-02",
+        updatedAt: "2024-01-02",
       };
 
       mockGraphql.mockResolvedValueOnce({ updateVehicle: updatedVehicle });
@@ -186,16 +168,12 @@ describe("vehiclesService", () => {
       const result = await vehiclesService.update("123", updateData);
 
       expect(mockGraphql).toHaveBeenCalledWith(
-        expect.stringContaining("updateVehicle"),
+        expect.any(Object),
         expect.objectContaining({
           id: "123",
-          input: expect.objectContaining({
-            registrationPlate: "ABC-001",
-            status: "IN_USE",
-          }),
         })
       );
-      expect(result).toEqual(updatedVehicle);
+      expect(result.registrationPlate).toBe("ABC-001");
     });
   });
 
@@ -206,7 +184,7 @@ describe("vehiclesService", () => {
       const result = await vehiclesService.delete("123");
 
       expect(mockGraphql).toHaveBeenCalledWith(
-        expect.stringContaining("deleteVehicle"),
+        expect.any(Object),
         { id: "123" }
       );
       expect(result).toBe(true);

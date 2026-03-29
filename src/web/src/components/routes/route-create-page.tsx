@@ -32,7 +32,7 @@ import { useCreateRoute } from "@/queries/routes";
 import { useVehicles } from "@/queries/vehicles";
 import { useParcelsForRouteCreation } from "@/queries/parcels";
 import { useDrivers } from "@/queries/drivers";
-import { VehicleStatus } from "@/types/vehicles";
+
 
 export default function NewRoutePage() {
   const router = useRouter();
@@ -55,24 +55,23 @@ export default function NewRoutePage() {
     });
   };
 
-  const { data: vehiclesData } = useVehicles({
-    pageSize: 100,
-    status: VehicleStatus.Available,
+  const { data: vehiclesData = [] } = useVehicles({
+    status: "AVAILABLE",
   });
   const { data: parcels = [], isLoading: parcelsLoading, error: parcelsError } =
     useParcelsForRouteCreation();
 
   const selectedVehicle = useMemo(
-    () => vehiclesData?.items.find((v) => v.id === formData.vehicleId),
-    [vehiclesData?.items, formData.vehicleId],
+    () => vehiclesData.find((v) => v.id === formData.vehicleId),
+    [vehiclesData, formData.vehicleId],
   );
 
   const { data: drivers = [], isLoading: driversLoading, error: driversError } =
     useDrivers(selectedVehicle?.depotId);
 
   const vehicleOptions = useMemo(
-    () => vehicleSelectOptionsForRoute(vehiclesData?.items),
-    [vehiclesData?.items],
+    () => vehicleSelectOptionsForRoute(vehiclesData),
+    [vehiclesData],
   );
   const driverOptions = useMemo(
     () => driverSelectOptions(drivers),
@@ -218,7 +217,7 @@ export default function NewRoutePage() {
                   !formData.vehicleId
                     ? "Select a vehicle first"
                     : driversLoading
-                      ? "Loading driversР Р†Р вЂљР’В¦"
+                      ? "Loading drivers"
                       : "Select driver"
                 }
               />
@@ -277,7 +276,7 @@ export default function NewRoutePage() {
               aria-label="Available parcels"
             >
               {parcelsLoading && (
-                <p className="text-sm text-muted-foreground">Loading parcelsР Р†Р вЂљР’В¦</p>
+                <p className="text-sm text-muted-foreground">Loading parcels</p>
               )}
               {parcelsError && (
                 <p className="text-sm text-destructive">
@@ -356,7 +355,7 @@ export default function NewRoutePage() {
             className="w-full sm:w-auto"
             disabled={createRoute.isPending || !capacityOk}
           >
-            {createRoute.isPending ? "CreatingР Р†Р вЂљР’В¦" : "Create route"}
+            {createRoute.isPending ? "Creating" : "Create route"}
           </Button>
         </FormActionsBar>
         </form>

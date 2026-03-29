@@ -1,140 +1,68 @@
 import {
   CREATE_ROUTE,
   PAGINATED_ROUTES,
-  ROUTE_BY_ID,
-  VEHICLE_ROUTE_HISTORY,
 } from "@/graphql/routes";
+import type {
+  GetRoutesQuery,
+  CreateRouteMutation,
+} from "@/graphql/routes";
+import type { RouteFilterInput } from "@/graphql/generated";
 import { graphqlRequest } from "@/lib/network/graphql-client";
-import {
+import type {
   Route,
   CreateRouteRequest,
-  PaginatedRoutesResult,
-  RouteStatus,
 } from "@/types/routes";
 import {
-  getMockRoutesByVehicle,
   getMockRouteById,
   mockRoutes,
 } from "@/mocks/routes.mock";
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_DATA === "true";
 
-/** GraphQL often returns .NET enums as names; UI expects numeric RouteStatus */
-const gqlStatusToRouteStatus: Record<string, RouteStatus> = {
-  PLANNED: RouteStatus.Planned,
-  IN_PROGRESS: RouteStatus.InProgress,
-  COMPLETED: RouteStatus.Completed,
-  CANCELLED: RouteStatus.Cancelled,
-};
-
-const routeStatusToGraphQL = (status: RouteStatus): string =>
-  (["PLANNED", "IN_PROGRESS", "COMPLETED", "CANCELLED"] as const)[status];
-
-function mapRouteStatus(s: unknown): RouteStatus {
-  if (typeof s === "number" && s >= 0 && s <= 3) return s as RouteStatus;
-  if (typeof s === "string" && s in gqlStatusToRouteStatus) {
-    return gqlStatusToRouteStatus[s];
-  }
-  return RouteStatus.Planned;
-}
-
-function mapRoute(raw: unknown): Route {
-  const r = raw as Record<string, unknown>;
+function mapRoute(raw: NonNullable<GetRoutesQuery["routes"]>[number]): Route {
   return {
-    id: String(r.id),
-    vehicleId: String(r.vehicleId),
-    vehiclePlate: String(r.vehiclePlate ?? ""),
-    driverId: String(r.driverId ?? ""),
-    driverName: String(r.driverName ?? ""),
-    startDate:
-      typeof r.startDate === "string"
-        ? r.startDate
-        : String(r.startDate ?? ""),
-    endDate: r.endDate == null ? null : String(r.endDate),
-    startMileage: Number(r.startMileage ?? 0),
-    endMileage: Number(r.endMileage ?? 0),
-    totalMileage: Number(r.totalMileage ?? 0),
-    status: mapRouteStatus(r.status),
-    parcelCount: Number(r.parcelCount ?? 0),
-    parcelsDelivered: Number(r.parcelsDelivered ?? 0),
-    createdAt:
-      typeof r.createdAt === "string"
-        ? r.createdAt
-        : String(r.createdAt ?? ""),
-  };
-}
-
-function mapRoutesPage(raw: {
-  items: unknown[];
-  totalCount: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}): PaginatedRoutesResult {
-  return {
-    ...raw,
-    items: raw.items.map(mapRoute),
-  };
-}
-
-function getMockRoutesPaginated(
-  vehicleId?: string,
-  page = 1,
-  pageSize = 20,
-  status?: RouteStatus
-): PaginatedRoutesResult {
-  let items = vehicleId
-    ? getMockRoutesByVehicle(vehicleId)
-    : [...mockRoutes];
-  if (status !== undefined) {
-    items = items.filter((r) => r.status === status);
-  }
-
-  const totalCount = items.length;
-  const totalPages = Math.ceil(totalCount / pageSize) || 1;
-  const start = (page - 1) * pageSize;
-  const paginatedItems = items.slice(start, start + pageSize);
-
-  return {
-    items: paginatedItems,
-    totalCount,
-    page,
-    pageSize,
-    totalPages,
+    id: raw.id,
+    vehicleId: raw.vehicleId,
+    vehiclePlate: raw.vehiclePlate ?? "Unknown vehicle",
+    driverId: raw.driverId,
+    driverName: raw.driverName ?? "Unknown driver",
+    startDate: raw.startDate,
+    endDate: raw.endDate ?? null,
+    startMileage: raw.startMileage,
+    endMileage: raw.endMileage,
+    totalMileage: raw.totalMileage,
+    status: raw.status,
+    parcelCount: raw.parcelCount,
+    parcelsDelivered: raw.parcelsDelivered,
+    createdAt: raw.createdAt,
   };
 }
 
 export const routesService = {
   getAll: async (
-    vehicleId?: string,
-    page = 1,
-    pageSize = 20,
-    status?: RouteStatus
-  ): Promise<PaginatedRoutesResult> => {
+    where?: RouteFilterInput
+  ): Promise<Route[]> => {
     if (USE_MOCK) {
-      return Promise.resolve(
-        getMockRoutesPaginated(vehicleId, page, pageSize, status)
-      );
+      let items = [...mockRoutes];
+      if (where?.status?.eq !== undefined) {
+        items = items.filter((r) => r.status === where.status!.eq);
+      }
+      if (where?.vehicleId?.eq !== undefined) {
+        items = items.filter((r) => r.vehicleId === where.vehicleId!.eq);
+      }
+      return Promise.resolve(items);
     }
 
-    const variables: Record<string, unknown> = { page, pageSize };
-    if (vehicleId !== undefined && vehicleId.trim() !== "") {
-      variables.vehicleId = vehicleId;
-    }
-    if (status !== undefined) {
-      variables.status = routeStatusToGraphQL(status);
+    const variables: Record<string, unknown> = {};
+    if (where !== undefined) {
+      variables.where = where;
     }
 
-    const data = await graphqlRequest<{
-      routes: {
-        items: unknown[];
-        totalCount: number;
-        page: number;
-        pageSize: number;
-        totalPages: number;
-      };
-    }>(PAGINATED_ROUTES, variables);
-    return mapRoutesPage(data.routes);
+    const data = await graphqlRequest<GetRoutesQuery>(
+      PAGINATED_ROUTES,
+      variables
+    );
+    return data.routes.map(mapRoute);
   },
 
   getById: async (id: string): Promise<Route> => {
@@ -144,39 +72,10 @@ export const routesService = {
       return Promise.resolve(route);
     }
 
-    const data = await graphqlRequest<{ route: unknown | null }>(
-      ROUTE_BY_ID,
-      { id }
-    );
-    if (!data.route) throw new Error("Route not found");
-    return mapRoute(data.route);
-  },
-
-  getVehicleHistory: async (
-    vehicleId: string,
-    page = 1,
-    pageSize = 10
-  ): Promise<PaginatedRoutesResult> => {
-    if (USE_MOCK) {
-      return Promise.resolve(
-        getMockRoutesPaginated(vehicleId, page, pageSize)
-      );
-    }
-
-    const data = await graphqlRequest<{
-      vehicleHistory: {
-        items: unknown[];
-        totalCount: number;
-        page: number;
-        pageSize: number;
-        totalPages: number;
-      };
-    }>(VEHICLE_ROUTE_HISTORY, {
-      vehicleId,
-      page,
-      pageSize,
-    });
-    return mapRoutesPage(data.vehicleHistory);
+    const routes = await routesService.getAll();
+    const route = routes.find((r) => r.id === id);
+    if (!route) throw new Error("Route not found");
+    return route;
   },
 
   create: async (data: CreateRouteRequest): Promise<Route> => {
@@ -192,7 +91,7 @@ export const routesService = {
         startMileage: data.startMileage,
         endMileage: 0,
         totalMileage: 0,
-        status: 0,
+        status: "PLANNED",
         parcelCount: data.parcelIds.length,
         parcelsDelivered: 0,
         createdAt: new Date().toISOString(),
@@ -200,7 +99,7 @@ export const routesService = {
       return Promise.resolve(newRoute);
     }
 
-    const res = await graphqlRequest<{ createRoute: unknown }>(
+    const res = await graphqlRequest<CreateRouteMutation>(
       CREATE_ROUTE,
       {
         input: {

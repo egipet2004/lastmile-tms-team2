@@ -31,7 +31,7 @@ import { vehicleCreateFormSchema } from "@/lib/validation/vehicles";
 import { zodErrorToFieldMap } from "@/lib/validation/zod-field-errors";
 import { useDepots } from "@/queries/depots";
 import { useCreateVehicle } from "@/queries/vehicles";
-import { VehicleType, VehicleStatus } from "@/types/vehicles";
+import type { VehicleType, VehicleStatus } from "@/types/vehicles";
 
 export default function NewVehiclePage() {
   const router = useRouter();
@@ -42,7 +42,7 @@ export default function NewVehiclePage() {
 
   const [formData, setFormData] = useState({
     registrationPlate: "",
-    type: VehicleType.Van,
+    type: "VAN" as VehicleType,
     parcelCapacity: 0,
     weightInput: "",
     depotId: "",
@@ -69,7 +69,7 @@ export default function NewVehiclePage() {
       type: formData.type,
       parcelCapacity: formData.parcelCapacity,
       weightCapacity,
-      status: VehicleStatus.Available,
+      status: "AVAILABLE" as VehicleStatus,
       depotId: formData.depotId,
     });
     if (!parsed.success) {
@@ -217,7 +217,7 @@ export default function NewVehiclePage() {
                       setFormData({ ...formData, depotId: v });
                     }}
                     placeholder={
-                      depotsLoading ? "Loading depotsР Р†Р вЂљР’В¦" : "Select depot"
+                      depotsLoading ? "Loading depots" : "Select depot"
                     }
                   />
                   {depotsError && (
@@ -244,7 +244,7 @@ export default function NewVehiclePage() {
                 className="w-full sm:w-auto"
                 disabled={createVehicle.isPending}
               >
-                {createVehicle.isPending ? "CreatingР Р†Р вЂљР’В¦" : "Create vehicle"}
+                {createVehicle.isPending ? "Creating" : "Create vehicle"}
               </Button>
             </FormActionsBar>
         </form>
