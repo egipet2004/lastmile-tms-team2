@@ -1,10 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Map as MapIcon, Pencil, Plus, Redo2, Trash2, Undo2 } from "lucide-react";
 import { useSession } from "next-auth/react";
-import type { Polygon } from "geojson";
 import {
   ListDataTable,
   ListPageHeader,
@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getMapboxAccessToken, getMapboxConfigurationError } from "@/lib/mapbox/config";
-import { geocodeDepotAddress } from "@/lib/mapbox/geocoding";
+import { formatDepotGeocodingQuery, geocodeDepotAddress } from "@/lib/mapbox/geocoding";
 import {
   createGeometryHistory,
   pushGeometrySnapshot,
@@ -103,8 +103,6 @@ export default function ZonesPage() {
   const [submitError, setSubmitError] = useState<string | undefined>();
   const [form, setForm] = useState<ZoneFormState>(defaultForm(undefined));
   const [draftHistory, setDraftHistory] = useState(createGeometryHistory(null));
-  const [fallbackDepotLocation, setFallbackDepotLocation] = useState<DepotGeoLocation | null>(null);
-  const [isGeocodingDepot, setIsGeocodingDepot] = useState(false);
 
   const isLoading = zonesLoading || depotsLoading;
   const queryError = zonesError ?? depotsError;
@@ -112,50 +110,34 @@ export default function ZonesPage() {
   const totalCount = zones?.length ?? 0;
   const selectedZone = zoneById(zones, selectedZoneId);
   const activeDepot = depots?.find((depot) => depot.id === form.depotId) ?? null;
+  const activeDepotAddress = activeDepot?.address ?? null;
+  const shouldGeocodeDepot =
+    status === "authenticated"
+    && mode !== "idle"
+    && Boolean(activeDepotAddress)
+    && !activeDepotAddress?.geoLocation
+    && Boolean(mapboxToken);
   const draftGeometry = draftHistory.present;
   const isBusy =
     createZone.isPending || updateZone.isPending || deleteZone.isPending;
 
-  useEffect(() => {
-    if (depots && mode === "idle" && !form.depotId) {
-      setForm(defaultForm(depots));
-    }
-  }, [depots, form.depotId, mode]);
-
-  useEffect(() => {
-    if (
-      mode === "idle"
-      || !activeDepot?.address
-      || activeDepot.address.geoLocation
-      || !mapboxToken
-    ) {
-      setFallbackDepotLocation(null);
-      setIsGeocodingDepot(false);
-      return;
-    }
-
-    const abortController = new AbortController();
-    setIsGeocodingDepot(true);
-
-    void geocodeDepotAddress(activeDepot.address, mapboxToken, abortController.signal)
-      .then((location) => {
-        setFallbackDepotLocation(location);
-      })
-      .catch(() => {
-        if (!abortController.signal.aborted) {
-          setFallbackDepotLocation(null);
-        }
-      })
-      .finally(() => {
-        if (!abortController.signal.aborted) {
-          setIsGeocodingDepot(false);
-        }
-      });
-
-    return () => {
-      abortController.abort();
-    };
-  }, [activeDepot, mapboxToken, mode]);
+  const activeDepotGeocodingQuery = useQuery<DepotGeoLocation | null>({
+    queryKey: [
+      "zones",
+      "depot-fallback-geocode",
+      activeDepot?.id ?? null,
+      activeDepotAddress ? formatDepotGeocodingQuery(activeDepotAddress) : null,
+      mapboxToken ?? null,
+    ],
+    queryFn: ({ signal }) =>
+      geocodeDepotAddress(activeDepotAddress as NonNullable<typeof activeDepotAddress>, mapboxToken as string, signal),
+    enabled: shouldGeocodeDepot,
+    staleTime: 1000 * 60 * 15,
+  });
+  const fallbackDepotLocation = shouldGeocodeDepot
+    ? activeDepotGeocodingQuery.data ?? null
+    : null;
+  const isGeocodingDepot = shouldGeocodeDepot && activeDepotGeocodingQuery.isPending;
 
   if (status === "loading" || isLoading) {
     return <ListPageLoading />;
@@ -175,8 +157,6 @@ export default function ZonesPage() {
     setSelectedZoneId(null);
     setSubmitError(undefined);
     setDraftHistory(createGeometryHistory(null));
-    setFallbackDepotLocation(null);
-    setIsGeocodingDepot(false);
     setForm(defaultForm(depots));
   }
 
@@ -185,7 +165,6 @@ export default function ZonesPage() {
     setSelectedZoneId(null);
     setSubmitError(undefined);
     setDraftHistory(createGeometryHistory(null));
-    setFallbackDepotLocation(null);
     setForm(defaultForm(depots));
   }
 

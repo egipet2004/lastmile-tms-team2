@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { SearchBox } from "@mapbox/search-js-react";
 import { Globe2, LocateFixed, Target } from "lucide-react";
-import type { Polygon } from "geojson";
+import type { FeatureCollection, Polygon } from "geojson";
 import type mapboxgl from "mapbox-gl";
 import type MapboxDraw from "@mapbox/mapbox-gl-draw";
 import { getZoneMapStyle } from "@/lib/mapbox/config";
@@ -59,6 +59,10 @@ export function ZoneMapEditor({
   const modeRef = useRef(mode);
   const onDraftGeometryChangeRef = useRef(onDraftGeometryChange);
   const onSelectZoneRef = useRef(onSelectZone);
+  const overlayPolygonsRef = useRef<FeatureCollection<Polygon>>({
+    type: "FeatureCollection",
+    features: [],
+  });
   const zoneLabelMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const depotMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const geolocateControlRef = useRef<mapboxgl.GeolocateControl | null>(null);
@@ -162,7 +166,8 @@ export function ZoneMapEditor({
     modeRef.current = mode;
     onDraftGeometryChangeRef.current = onDraftGeometryChange;
     onSelectZoneRef.current = onSelectZone;
-  }, [mode, onDraftGeometryChange, onSelectZone]);
+    overlayPolygonsRef.current = overlayData.polygons;
+  }, [mode, onDraftGeometryChange, onSelectZone, overlayData.polygons]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -253,7 +258,7 @@ export function ZoneMapEditor({
 
         map.addSource(OVERLAY_SOURCE_ID, {
           type: "geojson",
-          data: overlayData.polygons,
+          data: overlayPolygonsRef.current,
         });
 
         map.addLayer({
@@ -333,7 +338,7 @@ export function ZoneMapEditor({
 
         if (polygonFeatures.length === 0) {
           drawFeatureIdRef.current = null;
-          onDraftGeometryChange(null);
+          onDraftGeometryChangeRef.current(null);
           return;
         }
 
