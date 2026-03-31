@@ -68,7 +68,7 @@ public class ParcelGraphQLTests(CustomWebApplicationFactory factory)
             .GetProperty("data")
             .GetProperty("registerParcel");
 
-        result.GetProperty("status").GetString().Should().Be("REGISTERED");
+        result.GetProperty("status").GetString().Should().Be("Registered");
         result.GetProperty("trackingNumber").GetString().Should().StartWith("LM");
         result.GetProperty("id").GetString().Should().NotBeNullOrEmpty();
     }
@@ -278,7 +278,7 @@ public class ParcelGraphQLTests(CustomWebApplicationFactory factory)
             p.GetProperty("trackingNumber").GetString() == registeredTracking);
 
         registeredParcel.ValueKind.Should().NotBe(default, "the just-registered parcel should be in registeredParcels results");
-        registeredParcel.GetProperty("status").GetString().Should().Be("REGISTERED");
+        registeredParcel.GetProperty("status").GetString().Should().Be("Registered");
     }
 
     [Fact]
@@ -309,7 +309,7 @@ public class ParcelGraphQLTests(CustomWebApplicationFactory factory)
 
         foreach (var parcel in parcels)
         {
-            parcel.GetProperty("status").GetString().Should().Be("REGISTERED",
+            parcel.GetProperty("status").GetString().Should().Be("Registered",
                 "only parcels with status Registered should be returned by registeredParcels");
         }
     }
