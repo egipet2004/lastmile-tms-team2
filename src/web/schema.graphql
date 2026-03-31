@@ -78,7 +78,7 @@ type Query @authorize(roles: [ "Admin" ]) {
   depot(id: UUID!): Depot @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
   drivers(depotId: UUID): [Driver!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
   parcelsForRouteCreation: [ParcelRouteOption!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
-  getRegisteredParcels(order: [ParcelSortInput!] @cost(weight: "10") where: ParcelFilterInput @cost(weight: "10")): [Parcel!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager", "WarehouseOperator" ]) @cost(weight: "10")
+  registeredParcels(order: [ParcelSortInput!] @cost(weight: "10") where: ParcelFilterInput @cost(weight: "10")): [RegisteredParcel!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager", "WarehouseOperator" ]) @cost(weight: "10")
   routes(order: [RouteSortInput!] @cost(weight: "10") where: RouteFilterInput @cost(weight: "10")): [Route!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
   users(search: String isActive: Boolean depotId: UUID zoneId: UUID order: [UserManagementUserSortInput!] @cost(weight: "10") where: UserManagementUserFilterInput @cost(weight: "10")): [UserManagementUser!]! @cost(weight: "10")
   user(id: UUID!): UserManagementUser @cost(weight: "10")

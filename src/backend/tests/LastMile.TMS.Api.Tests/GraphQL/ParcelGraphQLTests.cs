@@ -190,7 +190,7 @@ public class ParcelGraphQLTests(CustomWebApplicationFactory factory)
 
     #endregion
 
-    #region getRegisteredParcels query
+    #region registeredParcels query
 
     [Fact]
     public async Task GetRegisteredParcels_AfterRegisteringParcel_ReturnsNewParcel()
@@ -252,7 +252,7 @@ public class ParcelGraphQLTests(CustomWebApplicationFactory factory)
         using var queryDoc = await PostGraphQLAsync(
             """
             query GetRegisteredParcels {
-              getRegisteredParcels {
+              registeredParcels {
                 trackingNumber
                 status
                 serviceType
@@ -264,11 +264,11 @@ public class ParcelGraphQLTests(CustomWebApplicationFactory factory)
             accessToken: token);
 
         queryDoc.RootElement.TryGetProperty("errors", out var queryErrors)
-            .Should().BeFalse("getRegisteredParcels should not return errors");
+            .Should().BeFalse("registeredParcels should not return errors");
 
         var parcels = queryDoc.RootElement
             .GetProperty("data")
-            .GetProperty("getRegisteredParcels")
+            .GetProperty("registeredParcels")
             .EnumerateArray()
             .ToList();
 
@@ -277,7 +277,7 @@ public class ParcelGraphQLTests(CustomWebApplicationFactory factory)
         var registeredParcel = parcels.FirstOrDefault(p =>
             p.GetProperty("trackingNumber").GetString() == registeredTracking);
 
-        registeredParcel.ValueKind.Should().NotBe(default, "the just-registered parcel should be in getRegisteredParcels results");
+        registeredParcel.ValueKind.Should().NotBe(default, "the just-registered parcel should be in registeredParcels results");
         registeredParcel.GetProperty("status").GetString().Should().Be("REGISTERED");
     }
 
@@ -290,7 +290,7 @@ public class ParcelGraphQLTests(CustomWebApplicationFactory factory)
         using var document = await PostGraphQLAsync(
             """
             query GetRegisteredParcels {
-              getRegisteredParcels {
+              registeredParcels {
                 trackingNumber
                 status
               }
@@ -303,14 +303,14 @@ public class ParcelGraphQLTests(CustomWebApplicationFactory factory)
 
         var parcels = document.RootElement
             .GetProperty("data")
-            .GetProperty("getRegisteredParcels")
+            .GetProperty("registeredParcels")
             .EnumerateArray()
             .ToList();
 
         foreach (var parcel in parcels)
         {
             parcel.GetProperty("status").GetString().Should().Be("REGISTERED",
-                "only parcels with status Registered should be returned by getRegisteredParcels");
+                "only parcels with status Registered should be returned by registeredParcels");
         }
     }
 

@@ -155,7 +155,13 @@ export function ParcelRegistrationForm({
     e.preventDefault();
     if (!validate()) return;
     try {
-      const parcel = await registerParcel.mutateAsync(form);
+      // Ensure date is sent as ISO 8601 DateTime (e.g. "2026-04-04T00:00:00+00:00")
+      // so HotChocolate can deserialize it to DateTimeOffset regardless of locale.
+      const isoDate = form.estimatedDeliveryDate
+        ? `${form.estimatedDeliveryDate}T00:00:00+00:00`
+        : form.estimatedDeliveryDate;
+
+      const parcel = await registerParcel.mutateAsync({ ...form, estimatedDeliveryDate: isoDate });
       setResult(parcel);
       onSuccess?.(parcel);
     } catch {
@@ -215,7 +221,7 @@ export function ParcelRegistrationForm({
               >
                 Register Another
               </Button>
-              <Button onClick={() => router.push("/admin/parcels")}>
+              <Button onClick={() => router.push("/parcels")}>
                 View Intake Queue
               </Button>
             </div>
@@ -491,64 +497,66 @@ export function ParcelRegistrationForm({
               />
             </div>
 
-            <div>
-              <Label htmlFor="weight" className="mb-1.5 block">
-                Weight <span className="text-destructive">*</span>
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="weight"
-                  type="number"
-                  min={0.01}
-                  step={0.1}
-                  value={form.weight}
-                  onChange={(e) => set("weight", parseFloat(e.target.value) || 0)}
-                  className="flex-1"
-                  aria-invalid={!!errors.weight}
-                />
-                <SelectDropdown
-                  options={weightUnitOptions}
-                  value={form.weightUnit}
-                  onChange={(v) => set("weightUnit", v)}
-                  className="w-24"
-                />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="weight" className="mb-1.5 block">
+                  Weight <span className="text-destructive">*</span>
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="weight"
+                    type="number"
+                    min={0.01}
+                    step={0.1}
+                    value={form.weight}
+                    onChange={(e) => set("weight", parseFloat(e.target.value) || 0)}
+                    className="flex-1 min-w-0"
+                    aria-invalid={!!errors.weight}
+                  />
+                  <SelectDropdown
+                    options={weightUnitOptions}
+                    value={form.weightUnit}
+                    onChange={(v) => set("weightUnit", v)}
+                    className="w-20 shrink-0"
+                  />
+                </div>
+                {errors.weight && (
+                  <p className="mt-1 text-sm text-destructive">{errors.weight}</p>
+                )}
               </div>
-              {errors.weight && (
-                <p className="mt-1 text-sm text-destructive">{errors.weight}</p>
-              )}
-            </div>
 
-            <div>
-              <Label htmlFor="declaredValue" className="mb-1.5 block">
-                Declared Value
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="declaredValue"
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={form.declaredValue}
-                  onChange={(e) =>
-                    set("declaredValue", parseFloat(e.target.value) || 0)
-                  }
-                  className="flex-1"
-                  aria-invalid={!!errors.declaredValue}
-                />
-                <Input
-                  value={form.currency}
-                  onChange={(e) =>
-                    set("currency", e.target.value.toUpperCase().slice(0, 3))
-                  }
-                  maxLength={3}
-                  className="w-20"
-                />
+              <div>
+                <Label htmlFor="declaredValue" className="mb-1.5 block">
+                  Declared Value
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="declaredValue"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.declaredValue}
+                    onChange={(e) =>
+                      set("declaredValue", parseFloat(e.target.value) || 0)
+                    }
+                    className="flex-1 min-w-0"
+                    aria-invalid={!!errors.declaredValue}
+                  />
+                  <Input
+                    value={form.currency}
+                    onChange={(e) =>
+                      set("currency", e.target.value.toUpperCase().slice(0, 3))
+                    }
+                    maxLength={3}
+                    className="w-16 shrink-0"
+                  />
+                </div>
+                {errors.declaredValue && (
+                  <p className="mt-1 text-sm text-destructive">
+                    {errors.declaredValue}
+                  </p>
+                )}
               </div>
-              {errors.declaredValue && (
-                <p className="mt-1 text-sm text-destructive">
-                  {errors.declaredValue}
-                </p>
-              )}
             </div>
 
             <div className="md:col-span-2">
@@ -652,6 +660,8 @@ export function ParcelRegistrationForm({
                   registerParcel.error instanceof Error
                     ? registerParcel.error.message
                     : "Registration failed. Please try again.";
+                const isUnexpected = /^Unexpected (Execution )?Error$/i.test(msg.trim());
+
                 if (
                   msg.includes("geocoded") ||
                   msg.includes("zone covers") ||
@@ -670,6 +680,33 @@ export function ParcelRegistrationForm({
                     </div>
                   );
                 }
+
+                if (msg.includes("was not found") || msg.includes("not exist")) {
+                  return (
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-destructive">
+                        Selected depot not found
+                      </p>
+                      <p className="text-sm text-destructive/80">
+                        The depot you selected may have been removed. Please refresh and try again.
+                      </p>
+                    </div>
+                  );
+                }
+
+                if (isUnexpected) {
+                  return (
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-destructive">
+                        An unexpected error occurred
+                      </p>
+                      <p className="text-sm text-destructive/80">
+                        Something went wrong on the server. Please try again or contact support if the problem persists.
+                      </p>
+                    </div>
+                  );
+                }
+
                 return (
                   <p className="text-sm text-destructive">{msg}</p>
                 );

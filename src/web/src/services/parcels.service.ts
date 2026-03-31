@@ -31,15 +31,15 @@ export const parcelsService = {
     return data.parcelsForRouteCreation;
   },
 
-  getRegisteredParcels: async (): Promise<GetRegisteredParcelsQuery["getRegisteredParcels"]> => {
+  getRegisteredParcels: async (): Promise<GetRegisteredParcelsQuery["registeredParcels"]> => {
     if (USE_MOCK) {
       return [];
     }
 
     const data = await graphqlRequest<{
-      getRegisteredParcels: GetRegisteredParcelsQuery["getRegisteredParcels"];
+      registeredParcels: GetRegisteredParcelsQuery["registeredParcels"];
     }>(REGISTERED_PARCELS);
-    return data.getRegisteredParcels;
+    return data.registeredParcels;
   },
 
   register: async (form: RegisterParcelFormData): Promise<RegisteredParcelResult> => {

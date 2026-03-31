@@ -1,5 +1,5 @@
 query GetRegisteredParcels {
-  getRegisteredParcels {
+  registeredParcels {
     id
     trackingNumber
     status
@@ -8,17 +8,7 @@ query GetRegisteredParcels {
     weightUnit
     parcelType
     createdAt
-    recipientAddress {
-      contactName
-      city
-      state
-      postalCode
-      countryCode
-    }
-    zone {
-      id
-      name
-    }
+    zoneName
   }
 }
 

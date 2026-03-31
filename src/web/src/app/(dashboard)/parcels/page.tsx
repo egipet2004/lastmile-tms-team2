@@ -1,7 +1,8 @@
 "use client";
 
-import { Package } from "lucide-react";
+import { useState } from "react";
 import { useSession } from "next-auth/react";
+import { Package, PackagePlus } from "lucide-react";
 
 import {
   ListDataTable,
@@ -14,9 +15,11 @@ import {
 } from "@/components/list";
 import { QueryErrorAlert } from "@/components/feedback/query-error-alert";
 import { OverflowTooltipCell } from "@/components/list/overflow-tooltip-cell";
+import { Button } from "@/components/ui/button";
 import { getErrorMessage } from "@/lib/network/error-message";
 import { useRegisteredParcels } from "@/queries/parcels";
 import { cn } from "@/lib/utils";
+import { ParcelRegistrationForm } from "@/components/parcels/parcel-registration-form";
 
 const SERVICE_TYPE_LABELS: Record<string, string> = {
   ECONOMY: "Economy",
@@ -25,11 +28,13 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
   OVERNIGHT: "Overnight",
 };
 
-const statusBadgeClass = "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200";
+const statusBadgeClass =
+  "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200";
 
 export default function ParcelsPage() {
   const { status: sessionStatus } = useSession();
   const { data = [], isLoading, error } = useRegisteredParcels();
+  const [showForm, setShowForm] = useState(false);
 
   if (sessionStatus === "loading" || isLoading) {
     return <ListPageLoading />;
@@ -44,12 +49,40 @@ export default function ParcelsPage() {
     );
   }
 
+  if (showForm) {
+    return (
+      <>
+        <ListPageHeader
+          title="Register Parcel"
+          description="Enter sender, recipient, and parcel details to register a new shipment."
+          icon={<PackagePlus strokeWidth={1.75} aria-hidden />}
+          action={
+            <Button variant="outline" onClick={() => setShowForm(false)}>
+              Cancel
+            </Button>
+          }
+        />
+        <ParcelRegistrationForm
+          onSuccess={() => {
+            setShowForm(false);
+          }}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <ListPageHeader
         title="Warehouse Intake Queue"
         description="Parcels registered and awaiting processing at the depot."
         icon={<Package strokeWidth={1.75} aria-hidden />}
+        action={
+          <Button onClick={() => setShowForm(true)}>
+            <PackagePlus className="h-4 w-4" aria-hidden />
+            Register Parcel
+          </Button>
+        }
       />
 
       {data.length === 0 ? (
@@ -74,7 +107,12 @@ export default function ParcelsPage() {
           <tbody>
             {data.map((parcel) => (
               <tr key={parcel.id} className={listDataTableBodyRowClass}>
-                <td className={cn(listDataTableTdClass, "font-mono text-xs font-medium")}>
+                <td
+                  className={cn(
+                    listDataTableTdClass,
+                    "font-mono text-xs font-medium"
+                  )}
+                >
                   <OverflowTooltipCell
                     fullText={parcel.trackingNumber}
                     className="font-medium"
@@ -85,26 +123,54 @@ export default function ParcelsPage() {
                 <td className={cn(listDataTableTdClass, "tabular-nums")}>
                   {parcel.weight} {parcel.weightUnit}
                 </td>
-                <td className={cn(listDataTableTdClass, "text-muted-foreground")}>
+                <td
+                  className={cn(
+                    listDataTableTdClass,
+                    "text-muted-foreground"
+                  )}
+                >
                   <OverflowTooltipCell
                     fullText={
                       parcel.parcelType
-                        ? `${parcel.parcelType} · ${SERVICE_TYPE_LABELS[parcel.serviceType] ?? parcel.serviceType}`
-                        : SERVICE_TYPE_LABELS[parcel.serviceType] ?? parcel.serviceType
+                        ? `${parcel.parcelType} · ${
+                            SERVICE_TYPE_LABELS[parcel.serviceType] ??
+                            parcel.serviceType
+                          }`
+                        : SERVICE_TYPE_LABELS[parcel.serviceType] ??
+                          parcel.serviceType
                     }
                   >
                     {parcel.parcelType
-                      ? `${parcel.parcelType} · ${SERVICE_TYPE_LABELS[parcel.serviceType] ?? parcel.serviceType}`
-                      : SERVICE_TYPE_LABELS[parcel.serviceType] ?? parcel.serviceType}
+                      ? `${parcel.parcelType} · ${
+                          SERVICE_TYPE_LABELS[parcel.serviceType] ??
+                          parcel.serviceType
+                        }`
+                      : SERVICE_TYPE_LABELS[parcel.serviceType] ??
+                        parcel.serviceType}
                   </OverflowTooltipCell>
                 </td>
-                <td className={cn(listDataTableTdClass, "text-muted-foreground")}>
+                <td
+                  className={cn(
+                    listDataTableTdClass,
+                    "text-muted-foreground"
+                  )}
+                >
                   {parcel.zoneName ?? "-"}
                 </td>
-                <td className={cn(listDataTableTdClass, "tabular-nums text-muted-foreground")}>
+                <td
+                  className={cn(
+                    listDataTableTdClass,
+                    "tabular-nums text-muted-foreground"
+                  )}
+                >
                   {new Date(parcel.createdAt).toLocaleDateString()}
                 </td>
-                <td className={cn(listDataTableTdClass, "max-w-[120px] align-middle")}>
+                <td
+                  className={cn(
+                    listDataTableTdClass,
+                    "max-w-[120px] align-middle"
+                  )}
+                >
                   <OverflowTooltipCell
                     shrinkToContent
                     fullText={parcel.status}
