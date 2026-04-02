@@ -2,13 +2,25 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Package, CheckCircle } from "lucide-react";
+import { SearchBox } from "@mapbox/search-js-react";
+import type {
+  SearchBoxFeatureSuggestion,
+  SearchBoxRetrieveResponse,
+} from "@mapbox/search-js-core";
+import { Package, CheckCircle, MapPinHouse } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectDropdown } from "@/components/form/select-dropdown";
+import { getMapboxAccessToken, getMapboxConfigurationError } from "@/lib/mapbox/config";
 import { appToast } from "@/lib/toast/app-toast";
 import { useDepots } from "@/queries/depots";
 import { useRegisterParcel } from "@/queries/parcels";
@@ -56,6 +68,115 @@ type ParcelFormState = {
   estimatedDeliveryDate: string;
 };
 
+type RecipientSearchSelection = {
+  accuracy: string | null;
+  label: string;
+};
+
+const recipientAutofillFieldKeys = [
+  "recipientStreet1",
+  "recipientCity",
+  "recipientState",
+  "recipientPostalCode",
+  "recipientCountryCode",
+] as const;
+
+const searchBoxTheme = {
+  variables: {
+    border: "1px solid rgba(148, 163, 184, 0.3)",
+    borderRadius: "1rem",
+    boxShadow: "0 20px 44px -28px rgba(15, 23, 42, 0.28)",
+    colorBackground: "#ffffff",
+    colorBackgroundHover: "#f8fafc",
+    colorPrimary: "#0f172a",
+    colorSecondary: "#64748b",
+    colorText: "#0f172a",
+    fontFamily: "inherit",
+    lineHeight: "1.45",
+    minWidth: "100%",
+    padding: "0.75rem",
+    spacing: "0.5rem",
+    unit: "0.95rem",
+  },
+} as const;
+
+function formatRegion(feature: SearchBoxFeatureSuggestion): string {
+  const regionCode = feature.properties.context.region?.region_code?.trim();
+  if (regionCode) {
+    const parts = regionCode.split("-");
+    return parts[parts.length - 1] ?? regionCode;
+  }
+
+  return feature.properties.context.region?.name?.trim() ?? "";
+}
+
+function formatStreetLine(feature: SearchBoxFeatureSuggestion): string {
+  const directAddress = feature.properties.address?.trim();
+  if (directAddress) {
+    return directAddress;
+  }
+
+  return [
+    feature.properties.context.address_number?.name?.trim(),
+    feature.properties.context.street?.name?.trim(),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+}
+
+function mapRetrieveResponseToRecipientSelection(
+  response: SearchBoxRetrieveResponse,
+): (RecipientSearchSelection & {
+  city: string;
+  countryCode: string;
+  postalCode: string;
+  state: string;
+  street1: string;
+}) | null {
+  const feature = response.features[0];
+  if (!feature) {
+    return null;
+  }
+
+  const city =
+    feature.properties.context.place?.name?.trim()
+    ?? feature.properties.context.locality?.name?.trim()
+    ?? feature.properties.context.district?.name?.trim()
+    ?? "";
+  const street1 = formatStreetLine(feature);
+  const label =
+    feature.properties.full_address?.trim()
+    ?? feature.properties.name?.trim()
+    ?? street1;
+
+  return {
+    accuracy: feature.properties.coordinates.accuracy ?? null,
+    city,
+    countryCode:
+      feature.properties.context.country?.country_code?.trim().toUpperCase() ?? "",
+    label,
+    postalCode: feature.properties.context.postcode?.name?.trim() ?? "",
+    state: formatRegion(feature),
+    street1,
+  };
+}
+
+function getSelectionAccuracyMessage(accuracy: string | null): string | null {
+  switch (accuracy) {
+    case "rooftop":
+      return "High-confidence rooftop match.";
+    case "parcel":
+      return "Parcel-level match.";
+    case "street":
+      return "Street-level match. Confirm the building number before submitting.";
+    case "proximate":
+      return "Approximate match. Confirm the street and postal code before submitting.";
+    default:
+      return null;
+  }
+}
+
 interface ParcelRegistrationFormProps {
   onSuccess?: (parcel: RegisteredParcelResult) => void;
   onCancel?: () => void;
@@ -70,6 +191,8 @@ export function ParcelRegistrationForm({
   const router = useRouter();
   const { data: depots = [], isLoading: depotsLoading } = useDepots();
   const registerParcel = useRegisterParcel();
+  const mapboxToken = getMapboxAccessToken();
+  const mapboxConfigurationError = getMapboxConfigurationError();
 
   const [form, setForm] = useState<ParcelFormState>({
     // Shipper
@@ -101,8 +224,11 @@ export function ParcelRegistrationForm({
     estimatedDeliveryDate: "",
   });
 
+  const [addressSearchValue, setAddressSearchValue] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [result, setResult] = useState<RegisteredParcelResult | null>(null);
+  const [recipientSearchSelection, setRecipientSearchSelection] =
+    useState<RecipientSearchSelection | null>(null);
 
   const depotOptions: SelectOption<string>[] = depots
     .filter((d) => d.isActive)
@@ -121,6 +247,15 @@ export function ParcelRegistrationForm({
 
   const dimensionUnitOptions: SelectOption<string>[] =
     ParcelDimensionUnitOptions.map((o) => ({ value: o.value, label: o.label }));
+  const selectedDepot = depots.find(
+    (depot) => depot.addressId === form.shipperAddressId,
+  );
+  const recipientSearchProximity = selectedDepot?.address?.geoLocation
+    ? {
+        lat: selectedDepot.address.geoLocation.latitude,
+        lng: selectedDepot.address.geoLocation.longitude,
+      }
+    : undefined;
 
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -128,6 +263,43 @@ export function ParcelRegistrationForm({
       const next = { ...e };
       delete next[key];
       return next;
+    });
+  }
+
+  function setRecipientAutofillField<
+    K extends typeof recipientAutofillFieldKeys[number],
+  >(key: K, value: ParcelFormState[K]) {
+    setRecipientSearchSelection(null);
+    set(key, value);
+  }
+
+  function applyRecipientSearchSelection(
+    response: SearchBoxRetrieveResponse,
+  ) {
+    const selection = mapRetrieveResponseToRecipientSelection(response);
+    if (!selection) {
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      recipientCity: selection.city || current.recipientCity,
+      recipientCountryCode: selection.countryCode || current.recipientCountryCode,
+      recipientPostalCode: selection.postalCode || current.recipientPostalCode,
+      recipientState: selection.state || current.recipientState,
+      recipientStreet1: selection.street1 || current.recipientStreet1,
+    }));
+    setErrors((current) => {
+      const next = { ...current };
+      for (const key of recipientAutofillFieldKeys) {
+        delete next[key];
+      }
+      return next;
+    });
+    setAddressSearchValue(selection.label);
+    setRecipientSearchSelection({
+      accuracy: selection.accuracy,
+      label: selection.label,
     });
   }
 
@@ -165,10 +337,6 @@ export function ParcelRegistrationForm({
       const isoDate = form.estimatedDeliveryDate
         ? `${form.estimatedDeliveryDate}T00:00:00+00:00`
         : form.estimatedDeliveryDate;
-
-      const selectedDepot = depots.find(
-        (depot) => depot.addressId === form.shipperAddressId,
-      );
 
       const parcel = await registerParcel.mutateAsync({
         ...form,
@@ -282,6 +450,10 @@ export function ParcelRegistrationForm({
               <Package className="h-4 w-4" />
               Sender (Depot)
             </CardTitle>
+            <CardDescription>
+              Choose the origin depot first so address search can bias results to
+              the right service area.
+            </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
@@ -307,11 +479,8 @@ export function ParcelRegistrationForm({
               )}
               {form.shipperAddressId &&
                 (() => {
-                  const selected = depots.find(
-                    (depot) => depot.addressId === form.shipperAddressId,
-                  );
-                  if (!selected?.address) return null;
-                  const address = selected.address;
+                  if (!selectedDepot?.address) return null;
+                  const address = selectedDepot.address;
                   return (
                     <p className="mt-2 rounded-xl border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
                       {address.street1}
@@ -332,8 +501,84 @@ export function ParcelRegistrationForm({
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">Recipient</CardTitle>
+            <CardDescription>
+              Start with search for a faster, cleaner address, then fine-tune the
+              delivery details below if needed.
+            </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <Label className="mb-1.5 block">Find Address</Label>
+              {mapboxToken ? (
+                <div className="parcel-address-search overflow-visible rounded-[1.25rem] border border-border/60 bg-gradient-to-br from-background via-background to-muted/30 p-3 shadow-[0_18px_45px_-35px_rgba(15,23,42,0.4)]">
+                  <SearchBox
+                    accessToken={mapboxToken}
+                    value={addressSearchValue}
+                    onChange={setAddressSearchValue}
+                    onClear={() => setAddressSearchValue("")}
+                    onRetrieve={applyRecipientSearchSelection}
+                    placeholder="Search recipient address or landmark..."
+                    options={{
+                      language: "en",
+                      limit: 5,
+                      ...(recipientSearchProximity
+                        ? { proximity: recipientSearchProximity }
+                        : {}),
+                    }}
+                    interceptSearch={(value) => {
+                      const query = value.trim();
+                      return query.length >= 3 ? query : "";
+                    }}
+                    popoverOptions={{
+                      flip: false,
+                      offset: 8,
+                      placement: "bottom-start",
+                    }}
+                    theme={searchBoxTheme}
+                  />
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    <span className="rounded-full border border-border/70 bg-background px-2.5 py-1 text-muted-foreground">
+                      3+ characters to search
+                    </span>
+                    <span className="rounded-full border border-border/70 bg-background px-2.5 py-1 text-muted-foreground">
+                      Landmarks supported
+                    </span>
+                    <span className="rounded-full border border-border/70 bg-background px-2.5 py-1 text-muted-foreground">
+                      Fields stay editable
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                  Address search is unavailable until Mapbox is configured.
+                  {mapboxConfigurationError ? ` ${mapboxConfigurationError}` : ""}
+                </p>
+              )}
+            </div>
+
+            {recipientSearchSelection ? (
+              <div className="md:col-span-2 rounded-[1.25rem] border border-emerald-200/80 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-950">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-full bg-emerald-100 p-2 text-emerald-700">
+                    <MapPinHouse className="h-4 w-4" aria-hidden />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-medium">Address matched from search</p>
+                    <p>{recipientSearchSelection.label}</p>
+                    {getSelectionAccuracyMessage(
+                      recipientSearchSelection.accuracy,
+                    ) ? (
+                      <p className="text-xs text-emerald-800/80">
+                        {getSelectionAccuracyMessage(
+                          recipientSearchSelection.accuracy,
+                        )}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <div className="md:col-span-2">
               <Label htmlFor="recipientStreet1" className="mb-1.5 block">
                 Street Address <span className="text-destructive">*</span>
@@ -341,7 +586,9 @@ export function ParcelRegistrationForm({
               <Input
                 id="recipientStreet1"
                 value={form.recipientStreet1}
-                onChange={(e) => set("recipientStreet1", e.target.value)}
+                onChange={(e) =>
+                  setRecipientAutofillField("recipientStreet1", e.target.value)
+                }
                 placeholder="123 Main St"
                 aria-invalid={!!errors.recipientStreet1}
               />
@@ -371,7 +618,9 @@ export function ParcelRegistrationForm({
               <Input
                 id="recipientCity"
                 value={form.recipientCity}
-                onChange={(e) => set("recipientCity", e.target.value)}
+                onChange={(e) =>
+                  setRecipientAutofillField("recipientCity", e.target.value)
+                }
                 aria-invalid={!!errors.recipientCity}
               />
               {errors.recipientCity && (
@@ -388,7 +637,9 @@ export function ParcelRegistrationForm({
               <Input
                 id="recipientState"
                 value={form.recipientState}
-                onChange={(e) => set("recipientState", e.target.value)}
+                onChange={(e) =>
+                  setRecipientAutofillField("recipientState", e.target.value)
+                }
                 aria-invalid={!!errors.recipientState}
               />
               {errors.recipientState && (
@@ -405,7 +656,9 @@ export function ParcelRegistrationForm({
               <Input
                 id="recipientPostalCode"
                 value={form.recipientPostalCode}
-                onChange={(e) => set("recipientPostalCode", e.target.value)}
+                onChange={(e) =>
+                  setRecipientAutofillField("recipientPostalCode", e.target.value)
+                }
                 aria-invalid={!!errors.recipientPostalCode}
               />
               {errors.recipientPostalCode && (
@@ -423,7 +676,10 @@ export function ParcelRegistrationForm({
                 id="recipientCountryCode"
                 value={form.recipientCountryCode}
                 onChange={(e) =>
-                  set("recipientCountryCode", e.target.value.toUpperCase().slice(0, 3))
+                  setRecipientAutofillField(
+                    "recipientCountryCode",
+                    e.target.value.toUpperCase().slice(0, 3),
+                  )
                 }
                 maxLength={3}
                 placeholder="US"
@@ -506,6 +762,10 @@ export function ParcelRegistrationForm({
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle className="text-base">Parcel Details</CardTitle>
+            <CardDescription>
+              Confirm service, package type, and measurements before creating the
+              label.
+            </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="md:col-span-2">
