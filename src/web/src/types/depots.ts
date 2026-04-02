@@ -6,6 +6,7 @@ export type DepotOption = {
 export interface Depot {
   id: string;
   name: string;
+  addressId: string;
   address: DepotAddress | null;
   operatingHours: DepotOperatingHours[] | null;
   isActive: boolean;
@@ -25,6 +26,12 @@ export interface DepotAddress {
   companyName: string | null;
   phone: string | null;
   email: string | null;
+  geoLocation: DepotGeoLocation | null;
+}
+
+export interface DepotGeoLocation {
+  latitude: number;
+  longitude: number;
 }
 
 export interface DepotOperatingHours {

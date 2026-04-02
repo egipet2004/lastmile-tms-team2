@@ -2,7 +2,10 @@ using HotChocolate.Data.Filters;
 using HotChocolate.Data.Sorting;
 using HotChocolate.Types;
 using LastMile.TMS.Api.GraphQL.Common;
+using LastMile.TMS.Application.Common.Interfaces;
 using LastMile.TMS.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+using NetTopologySuite.Geometries;
 
 namespace LastMile.TMS.Api.GraphQL.Depots;
 
@@ -22,6 +25,41 @@ public sealed class AddressType : EntityObjectType<Address>
         descriptor.Field(a => a.CompanyName);
         descriptor.Field(a => a.Phone);
         descriptor.Field(a => a.Email);
+        descriptor.Field("geoLocation")
+            .Type<GeoLocationType>()
+            .Resolve(async ctx =>
+            {
+                var address = ctx.Parent<Address>();
+                if (address.GeoLocation is Point directPoint)
+                {
+                    return new GeoLocationDto(directPoint.Y, directPoint.X);
+                }
+
+                var dbContext = ctx.Service<IAppDbContext>();
+                var point = await dbContext.Addresses
+                    .AsNoTracking()
+                    .Where(a =>
+                        a.Street1 == address.Street1
+                        && a.City == address.City
+                        && a.CountryCode == address.CountryCode)
+                    .Select(a => a.GeoLocation)
+                    .FirstOrDefaultAsync(ctx.RequestAborted);
+
+                return point is null ? null : new GeoLocationDto(point.Y, point.X);
+            });
+    }
+}
+
+public sealed record GeoLocationDto(double Latitude, double Longitude);
+
+public sealed class GeoLocationType : ObjectType<GeoLocationDto>
+{
+    protected override void Configure(IObjectTypeDescriptor<GeoLocationDto> descriptor)
+    {
+        descriptor.Name("GeoLocation");
+        descriptor.BindFieldsExplicitly();
+        descriptor.Field(g => g.Latitude);
+        descriptor.Field(g => g.Longitude);
     }
 }
 
@@ -44,6 +82,7 @@ public sealed class DepotType : EntityObjectType<Depot>
         descriptor.Name("Depot");
         descriptor.Field(d => d.Id);
         descriptor.Field(d => d.Name);
+        descriptor.Field(d => d.AddressId);
         descriptor.Field(d => d.Address).Type<AddressType>();
         descriptor.Field(d => d.OperatingHours).Type<ListType<NonNullType<OperatingHoursType>>>();
         descriptor.Field(d => d.IsActive);

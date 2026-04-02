@@ -1,28 +1,37 @@
 using System.Text.Json;
 using FluentAssertions;
+using LastMile.TMS.Domain.Entities;
 using LastMile.TMS.Persistence;
+using Microsoft.Extensions.DependencyInjection;
+using NetTopologySuite;
+using NetTopologySuite.Geometries;
 
 namespace LastMile.TMS.Api.Tests.GraphQL;
 
 [Collection(ApiTestCollection.Name)]
 public class ZoneGraphQLTests : GraphQLTestBase, IAsyncLifetime
 {
+    private static readonly GeometryFactory GeometryFactory =
+        NtsGeometryServices.Instance.CreateGeometryFactory(srid: 4326);
+
     public ZoneGraphQLTests(CustomWebApplicationFactory factory) : base(factory)
     {
     }
 
     [Fact]
-    public async Task Zones_WithAdminToken_ReturnsZones()
+    public async Task Zones_WithAdminToken_ReturnsBoundaryGeoJson()
     {
+        var zoneId = await SeedZoneAsync();
         var token = await GetAdminAccessTokenAsync();
 
         using var document = await PostGraphQLAsync(
             """
-            query {
-              zones {
+            query ($id: UUID!) {
+              zone(id: $id) {
                 id
                 name
                 boundary
+                boundaryGeoJson
                 isActive
                 depotId
                 depotName
@@ -31,6 +40,7 @@ public class ZoneGraphQLTests : GraphQLTestBase, IAsyncLifetime
               }
             }
             """,
+            variables: new { id = zoneId },
             accessToken: token);
 
         var hasErrors = document.RootElement.TryGetProperty("errors", out var errors);
@@ -41,16 +51,67 @@ public class ZoneGraphQLTests : GraphQLTestBase, IAsyncLifetime
             Assert.Fail($"GraphQL errors: {errorText}");
         }
 
-        var zones = document.RootElement
+        var zone = document.RootElement
             .GetProperty("data")
-            .GetProperty("zones")
-            .EnumerateArray()
-            .ToList();
+            .GetProperty("zone");
 
-        zones.Should().NotBeEmpty();
+        zone.GetProperty("id").GetString().Should().Be(zoneId.ToString());
+        zone.GetProperty("boundary").GetString().Should().StartWith("POLYGON");
+
+        using var boundaryGeoJson = JsonDocument.Parse(zone.GetProperty("boundaryGeoJson").GetString()!);
+        boundaryGeoJson.RootElement.GetProperty("type").GetString().Should().Be("Polygon");
+        boundaryGeoJson.RootElement.GetProperty("coordinates")[0].GetArrayLength().Should().BeGreaterThanOrEqualTo(4);
     }
 
     public Task InitializeAsync() => Factory.ResetDatabaseAsync();
 
     public Task DisposeAsync() => Task.CompletedTask;
+
+    private async Task<Guid> SeedZoneAsync()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var depot = new Depot
+        {
+            Name = $"Zone Depot {Guid.NewGuid():N}",
+            Address = new Address
+            {
+                Street1 = "200 Collins Street",
+                City = "Melbourne",
+                State = "VIC",
+                PostalCode = "3000",
+                CountryCode = "AU",
+                CreatedAt = DateTimeOffset.UtcNow,
+                CreatedBy = "tests"
+            },
+            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedBy = "tests"
+        };
+
+        var boundary = GeometryFactory.CreatePolygon(
+            [
+                new Coordinate(144.95, -37.82),
+                new Coordinate(144.98, -37.82),
+                new Coordinate(144.98, -37.79),
+                new Coordinate(144.95, -37.79),
+                new Coordinate(144.95, -37.82),
+            ]);
+        boundary.SRID = 4326;
+
+        var zone = new Zone
+        {
+            Name = $"Zone GraphQL {Guid.NewGuid():N}",
+            Boundary = boundary,
+            IsActive = true,
+            Depot = depot,
+            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedBy = "tests"
+        };
+
+        dbContext.Zones.Add(zone);
+        await dbContext.SaveChangesAsync();
+
+        return zone.Id;
+    }
 }

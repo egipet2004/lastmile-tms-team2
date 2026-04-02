@@ -2,6 +2,7 @@ query GetDepots {
   depots {
     id
     name
+    addressId
     address {
       street1
       street2
@@ -14,6 +15,10 @@ query GetDepots {
       companyName
       phone
       email
+      geoLocation {
+        latitude
+        longitude
+      }
     }
     operatingHours {
       dayOfWeek
@@ -31,6 +36,7 @@ query GetDepot($id: UUID!) {
   depot(id: $id) {
     id
     name
+    addressId
     address {
       street1
       street2
@@ -43,6 +49,10 @@ query GetDepot($id: UUID!) {
       companyName
       phone
       email
+      geoLocation {
+        latitude
+        longitude
+      }
     }
     operatingHours {
       dayOfWeek
@@ -60,6 +70,7 @@ mutation CreateDepot($input: CreateDepotInput!) {
   createDepot(input: $input) {
     id
     name
+    addressId
     address {
       street1
       street2
@@ -72,6 +83,10 @@ mutation CreateDepot($input: CreateDepotInput!) {
       companyName
       phone
       email
+      geoLocation {
+        latitude
+        longitude
+      }
     }
     operatingHours {
       dayOfWeek
@@ -89,6 +104,7 @@ mutation UpdateDepot($id: UUID!, $input: UpdateDepotInput!) {
   updateDepot(id: $id, input: $input) {
     id
     name
+    addressId
     address {
       street1
       street2
@@ -101,6 +117,10 @@ mutation UpdateDepot($id: UUID!, $input: UpdateDepotInput!) {
       companyName
       phone
       email
+      geoLocation {
+        latitude
+        longitude
+      }
     }
     operatingHours {
       dayOfWeek

@@ -1,4 +1,8 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
+
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 /** Allow next/image to load driver photos from the API host (NEXT_PUBLIC_API_URL). */
 function apiImageRemotePatterns(): NonNullable<
@@ -34,6 +38,10 @@ function apiImageRemotePatterns(): NonNullable<
 const nextConfig: NextConfig = {
   reactCompiler: true,
   output: "standalone",
+  outputFileTracingRoot: projectRoot,
+  turbopack: {
+    root: projectRoot,
+  },
   images: {
     remotePatterns: apiImageRemotePatterns(),
   },
