@@ -72,6 +72,8 @@ type Mutation @authorize(roles: [ "Admin" ]) {
   updateDriver(id: UUID! input: UpdateDriverInput!): Driver! @authorize(roles: [ "Admin", "OperationsManager" ]) @cost(weight: "10")
   deleteDriver(id: UUID!): Boolean! @authorize(roles: [ "Admin", "OperationsManager" ]) @cost(weight: "10")
   registerParcel(input: RegisterParcelInput!): RegisteredParcel! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager", "WarehouseOperator" ]) @cost(weight: "10")
+  updateParcel(input: UpdateParcelInput!): ParcelDetail @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager", "WarehouseOperator" ]) @cost(weight: "10")
+  cancelParcel(input: CancelParcelInput!): ParcelDetail @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager", "WarehouseOperator" ]) @cost(weight: "10")
   createRoute(input: CreateRouteInput!): Route! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
   createUser(input: CreateUserInput!): UserManagementUser! @cost(weight: "10")
   updateUser(input: UpdateUserInput!): UserManagementUser! @cost(weight: "10")
@@ -94,10 +96,19 @@ type OperatingHours {
   isClosed: Boolean!
 }
 
+type ParcelChangeHistory {
+  action: String!
+  fieldName: String!
+  beforeValue: String
+  afterValue: String
+  changedAt: DateTime!
+  changedBy: String
+}
 type ParcelDetail {
   id: UUID!
   trackingNumber: String!
   status: String!
+  shipperAddressId: UUID!
   serviceType: String!
   weight: Decimal!
   weightUnit: String!
@@ -109,6 +120,7 @@ type ParcelDetail {
   currency: String!
   description: String
   parcelType: String
+  cancellationReason: String
   estimatedDeliveryDate: DateTime!
   deliveryAttempts: Int!
   zoneId: UUID!
@@ -117,7 +129,10 @@ type ParcelDetail {
   depotName: String
   createdAt: DateTime!
   lastModifiedAt: DateTime
+  canEdit: Boolean!
+  canCancel: Boolean!
   recipientAddress: ParcelDetailAddress!
+  changeHistory: [ParcelChangeHistory!]!
 }
 
 type ParcelDetailAddress {
@@ -188,6 +203,7 @@ type Query @authorize(roles: [ "Admin" ]) {
   parcel(id: UUID!): ParcelDetail @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager", "WarehouseOperator" ]) @cost(weight: "10")
   parcelsForRouteCreation: [ParcelRouteOption!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
   registeredParcels(where: ParcelFilterInput @cost(weight: "10") order: [ParcelSortInput!] @cost(weight: "10")): [RegisteredParcel!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager", "WarehouseOperator" ]) @cost(weight: "10")
+  preLoadParcels(where: ParcelFilterInput @cost(weight: "10") order: [ParcelSortInput!] @cost(weight: "10")): [RegisteredParcel!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager", "WarehouseOperator" ]) @cost(weight: "10")
   parcelImports: [ParcelImportHistory!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager", "WarehouseOperator" ]) @cost(weight: "10")
   parcelImport(id: UUID!): ParcelImport @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager", "WarehouseOperator" ]) @cost(weight: "10")
   routes(where: RouteFilterInput @cost(weight: "10") order: [RouteSortInput!] @cost(weight: "10")): [Route!]! @authorize(roles: [ "Admin", "Dispatcher", "OperationsManager" ]) @cost(weight: "10")
@@ -362,6 +378,11 @@ input AddressSortInput {
 input BooleanOperationFilterInput {
   eq: Boolean @cost(weight: "10")
   neq: Boolean @cost(weight: "10")
+}
+
+input CancelParcelInput {
+  id: UUID!
+  reason: String!
 }
 
 input CompletePasswordResetInput {
@@ -725,6 +746,24 @@ input UpdateDepotInput {
   address: AddressInput
   operatingHours: [OperatingHoursInput!]
   isActive: Boolean!
+}
+
+input UpdateParcelInput {
+  id: UUID!
+  shipperAddressId: UUID!
+  recipientAddress: RegisterParcelRecipientAddressInput!
+  description: String
+  serviceType: ServiceType!
+  weight: Decimal!
+  weightUnit: WeightUnit!
+  length: Decimal!
+  width: Decimal!
+  height: Decimal!
+  dimensionUnit: DimensionUnit!
+  declaredValue: Decimal!
+  currency: String!
+  estimatedDeliveryDate: DateTime!
+  parcelType: String
 }
 
 input UpdateDriverAvailabilityInput {
