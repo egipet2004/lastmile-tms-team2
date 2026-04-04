@@ -237,7 +237,7 @@ export default function ParcelsPage() {
                 <tr className={listDataTableHeadRowClass}>
                   <th className={cn(listDataTableThClass, "w-14")}>Select</th>
                   <th className={listDataTableThClass}>Tracking</th>
-                  <th className={listDataTableThClass}>Summary</th>
+                  <th className={listDataTableThClass}>Recipient</th>
                   <th className={listDataTableThClass}>Weight</th>
                   <th className={listDataTableThClass}>Type</th>
                   <th className={listDataTableThClass}>Zone</th>
@@ -274,13 +274,37 @@ export default function ParcelsPage() {
                     </td>
                     <td className={cn(listDataTableTdClass, "max-w-[220px]")}>
                       <OverflowTooltipCell
-                        fullText={
-                          parcel.parcelType ??
-                          `${formatParcelServiceType(parcel.serviceType)} service`
-                        }
+                        fullText={[
+                          parcel.recipientContactName,
+                          parcel.recipientCompanyName,
+                          parcel.recipientStreet1,
+                          parcel.recipientCity,
+                          parcel.recipientPostalCode,
+                        ]
+                          .filter(Boolean)
+                          .join("\n")}
                       >
-                        {parcel.parcelType ??
-                          `${formatParcelServiceType(parcel.serviceType)} service`}
+                        <div className="space-y-0.5">
+                          {parcel.recipientContactName ? (
+                            <span className="block font-medium">
+                              {parcel.recipientContactName}
+                            </span>
+                          ) : null}
+                          {parcel.recipientCompanyName ? (
+                            <span className="block text-xs text-muted-foreground">
+                              {parcel.recipientCompanyName}
+                            </span>
+                          ) : null}
+                          <span className="block text-xs text-muted-foreground">
+                            {[
+                              parcel.recipientStreet1,
+                              parcel.recipientCity,
+                              parcel.recipientPostalCode,
+                            ]
+                              .filter(Boolean)
+                              .join(", ")}
+                          </span>
+                        </div>
                       </OverflowTooltipCell>
                     </td>
                     <td className={cn(listDataTableTdClass, "tabular-nums")}>
