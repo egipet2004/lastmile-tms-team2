@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowUpDown, ArrowUp, ArrowDown, FileText, Package, PackagePlus, Printer, Search, X } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -10,6 +10,8 @@ import {
   ListDataTable,
   ListPageHeader,
   ListPageLoading,
+  ListPagePagination,
+  ListPageStatsStrip,
   listDataTableBodyRowClass,
   listDataTableHeadRowClass,
   listDataTableTdClass,
@@ -57,6 +59,8 @@ export default function ParcelsPage() {
   const [dateTo, setDateTo] = useState("");
   const [sortField, setSortField] = useState<string | undefined>();
   const [sortDirection, setSortDirection] = useState<"ASC" | "DESC">("ASC");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const debouncedSearch = useDebounce(search, 300);
   const { data: zones = [] } = useZones();
@@ -71,6 +75,24 @@ export default function ParcelsPage() {
     dateTo !== "" ? new Date(`${dateTo}T23:59:59Z`).toISOString() : undefined,
     sortField ? `${sortField} ${sortDirection}` : undefined,
   );
+
+  const total = data.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = total === 0 ? 0 : Math.min(page * pageSize, total);
+  const pagedData = useMemo(
+    () => data.slice((page - 1) * pageSize, page * pageSize),
+    [data, page, pageSize],
+  );
+
+  // Reset to page 1 when data set changes
+  const prevTotal = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (prevTotal.current !== undefined && prevTotal.current !== total) {
+      setPage(1);
+    }
+    prevTotal.current = total;
+  }, [total]);
 
   function handleSort(field: string) {
     if (sortField === field) {
@@ -343,12 +365,45 @@ export default function ParcelsPage() {
                 />
                 Select all visible
               </label>
-              <p className="text-muted-foreground">
-                {selectedTrackingNumbers.length === 0
-                  ? "No parcels selected."
-                  : `${selectedTrackingNumbers.length} selected: ${selectedTrackingNumbers.join(", ")}`}
-              </p>
+              <div className="flex items-center gap-3">
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                  }}
+                  className="rounded border border-input bg-background px-2 py-1 text-sm"
+                  aria-label="Parcels per page"
+                >
+                  <option value={10}>10 per page</option>
+                  <option value={20}>20 per page</option>
+                  <option value={50}>50 per page</option>
+                  <option value={100}>100 per page</option>
+                </select>
+                <span className="text-xs text-muted-foreground">
+                  {selectedTrackingNumbers.length === 0
+                    ? "No parcels selected."
+                    : `${selectedTrackingNumbers.length} selected`}
+                </span>
+              </div>
             </div>
+
+            <ListPageStatsStrip
+              totalLabel="Total parcels"
+              totalCount={total}
+              rangeEntityLabel="parcels"
+              from={from}
+              to={to}
+              page={page}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              filterCardLabel="Active filter"
+              filterCardHint="Adjust filters above"
+              activeFilterDisplay={
+                hasActiveFilters || debouncedSearch
+                  ? "Filtered"
+                  : "No filters"
+              }
+            />
 
             <ListDataTable minWidthClassName="min-w-[1140px]">
               <thead>
@@ -366,7 +421,7 @@ export default function ParcelsPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.map((parcel) => (
+                {pagedData.map((parcel) => (
                   <tr key={parcel.id} className={listDataTableBodyRowClass}>
                     <td className={cn(listDataTableTdClass, "w-14 align-middle")}>
                       <input
@@ -495,6 +550,12 @@ export default function ParcelsPage() {
                 ))}
               </tbody>
             </ListDataTable>
+
+            <ListPagePagination
+              page={page}
+              totalPages={totalPages}
+              setPage={setPage}
+            />
           </>
         )}
 
